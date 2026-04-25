@@ -27,24 +27,23 @@
 - `.venv-job-globe\Scripts\python.exe -m pytest -p no:cacheprovider apps\workers\tests` passed.
 - `npm.cmd audit --audit-level=high --json` passed with zero high and zero critical advisories. It reports two moderate advisories from Next/PostCSS, with npm suggesting a breaking downgrade that is not appropriate.
 - `.venv-job-globe\Scripts\python.exe -m pip_audit -r apps\workers\requirements.txt --desc off --format json` passed with no known runtime dependency vulnerabilities.
-- `docker compose -f infra/docker/docker-compose.dev.yml config --quiet` passed. Docker printed a local config-file access warning.
+- `docker compose -f infra/docker/docker-compose.dev.yml config --quiet` passed.
+- `docker compose -f infra/docker/docker-compose.dev.yml up -d postgres redis` passed with PostgreSQL and Redis healthy.
+- Local migrations executed through the PostgreSQL Docker initialization path and created 17 public tables.
+- Local seed execution populated the demo database with 200 jobs, 10 country codes across 20 location rows, 15 companies, and 5 saved jobs.
+- pgvector is installed and runtime-tested with a vector distance query.
+- `jobs_canonical.search_document` is populated by trigger and returned 25 searchable demo job rows for the engineer query smoke test.
+- `docker compose -f infra/docker/docker-compose.dev.yml up -d --build web workers` passed.
+- The local web container responded with HTTP 200 at `http://localhost:3000`.
+- The local worker container stays running and connects to Redis through the Compose service DNS name.
 
 ## Not Complete From Source Code Alone
 
 These items are real Step 1 handoff/admin tasks and cannot be honestly completed by only editing the repository:
 
-- Start Docker services and execute migrations/seeds locally or in staging. Attempted local `docker compose up -d postgres redis`, but Docker Desktop is not running: `dockerDesktopLinuxEngine` pipe was missing.
 - Enable GitHub branch protection on `main`: require PR review, require CI, block force push, block deletion.
 - Configure Supabase project, auth callback URLs, JWT/session settings, and staging secrets.
 - Run migrations and demo seed against the staging database and capture the `\dt` verification output.
 - Get Product Owner approval for the Step 1 ADRs and wireframes.
 - Get Legal/Privacy Advisor sign-off on `docs/decisions/privacy-framework.md`.
 - Connect the staging deploy workflow to the chosen hosting platform.
-
-## Next Manual Command When Docker Desktop Is Running
-
-```powershell
-docker compose -f infra/docker/docker-compose.dev.yml up -d postgres redis
-$env:DATABASE_URL="postgresql://job_globe:job_globe@localhost:5432/job_globe"
-sh infra/scripts/seed-demo-data.sh
-```

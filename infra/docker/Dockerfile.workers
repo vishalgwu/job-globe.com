@@ -3,4 +3,4 @@ WORKDIR /app
 COPY apps/workers/pyproject.toml apps/workers/pyproject.toml
 COPY apps/workers/src apps/workers/src
 RUN pip install --no-cache-dir -e apps/workers
-CMD ["python", "-c", "from job_globe_workers.settings import settings; print(settings.redis_url)"]
+CMD ["python", "-m", "job_globe_workers.runtime"]

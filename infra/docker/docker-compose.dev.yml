@@ -32,6 +32,9 @@ services:
       dockerfile: infra/docker/Dockerfile.web
     env_file:
       - ../../.env.example
+    environment:
+      DATABASE_URL: postgresql://job_globe:job_globe@postgres:5432/job_globe
+      REDIS_URL: redis://redis:6379/0
     ports:
       - "3000:3000"
     depends_on:
@@ -46,6 +49,9 @@ services:
       dockerfile: infra/docker/Dockerfile.workers
     env_file:
       - ../../.env.example
+    environment:
+      DATABASE_URL: postgresql://job_globe:job_globe@postgres:5432/job_globe
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       postgres:
         condition: service_healthy

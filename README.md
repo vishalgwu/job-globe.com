@@ -12,6 +12,15 @@ npm.cmd run dev
 
 `npm.cmd run dev` starts PostgreSQL 15 + pgvector, Redis 7, the placeholder web app, and the placeholder worker image through Docker Compose.
 
+For an explicit Docker smoke test:
+
+```powershell
+docker compose -f infra/docker/docker-compose.dev.yml up -d postgres redis
+docker cp packages/database/seeds docker-postgres-1:/tmp/job-globe-seeds
+docker compose -f infra/docker/docker-compose.dev.yml exec -T postgres psql -U job_globe -d job_globe -v ON_ERROR_STOP=1 -f /tmp/job-globe-seeds/taxonomy_reference.sql -f /tmp/job-globe-seeds/demo_jobs.sql
+docker compose -f infra/docker/docker-compose.dev.yml up -d --build web workers
+```
+
 ## Repository Layout
 
 - `apps/web` - Next.js frontend application shell

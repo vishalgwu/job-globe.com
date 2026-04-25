@@ -24,17 +24,37 @@ CREATE TABLE IF NOT EXISTS jobs_canonical (
   employment_type TEXT NOT NULL DEFAULT 'full-time',
   remote_type job_remote_type NOT NULL DEFAULT 'unknown',
   seniority TEXT NOT NULL DEFAULT 'unknown',
-  apply_url TEXT NOT NULL,
+  apply_url TEXT NOT NULL UNIQUE,
   salary_min INTEGER,
   salary_max INTEGER,
   currency CHAR(3) DEFAULT 'USD',
   required_skills TEXT[] NOT NULL DEFAULT '{}',
   status TEXT NOT NULL DEFAULT 'active',
-  search_document TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', coalesce(title, '') || ' ' || coalesce(description, '') || ' ' || array_to_string(required_skills, ' '))) STORED,
+  search_document TSVECTOR NOT NULL DEFAULT ''::tsvector,
   first_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   expires_at TIMESTAMPTZ
 );
+
+CREATE OR REPLACE FUNCTION refresh_jobs_canonical_search_document()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.search_document :=
+    setweight(to_tsvector('english', coalesce(NEW.title, '')), 'A') ||
+    setweight(to_tsvector('english', coalesce(NEW.description, '')), 'B') ||
+    setweight(to_tsvector('english', coalesce(array_to_string(NEW.required_skills, ' '), '')), 'A');
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_jobs_canonical_search_document ON jobs_canonical;
+CREATE TRIGGER trg_jobs_canonical_search_document
+BEFORE INSERT OR UPDATE OF title, description, required_skills
+ON jobs_canonical
+FOR EACH ROW
+EXECUTE FUNCTION refresh_jobs_canonical_search_document();
 
 CREATE INDEX IF NOT EXISTS idx_jobs_raw_payload_gin ON jobs_raw USING GIN (payload);
 CREATE INDEX IF NOT EXISTS idx_jobs_canonical_search_gin ON jobs_canonical USING GIN (search_document);

@@ -1,0 +1,16 @@
+.git
+.github
+node_modules
+**/node_modules
+.venv-job-globe
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/pytest-cache-files-*
+**/.mypy_cache
+**/.ruff_cache
+apps/web/.next
+**/*.tsbuildinfo
+.env
+.env.local
+.DS_Store
