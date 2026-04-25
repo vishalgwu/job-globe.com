@@ -1,0 +1,18 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  scaffold-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm scaffold exists
+        run: |
+          test -d apps/web
+          test -d apps/workers
+          test -d packages/database/migrations
+          test -d docs/decisions

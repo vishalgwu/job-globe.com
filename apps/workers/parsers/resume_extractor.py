@@ -1,0 +1,1 @@
+"""Resume extraction entry point."""
