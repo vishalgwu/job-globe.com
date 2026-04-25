@@ -1,13 +1,13 @@
-# ADR-001-monorepo-structure.md
+# ADR-001: Monorepo Structure
 
 ## Status
-Proposed
+Accepted for Step 1
 
 ## Decision
-TODO
+Use a monorepo with `apps/web`, `apps/workers`, `packages/database`, `packages/shared-types`, `packages/config`, `infra`, and `docs`.
 
 ## Context
-TODO
+The build plan requires a Next.js frontend, a Python worker plane, shared schemas, shared config, and infrastructure code. Application folders must not import directly from other application folders.
 
 ## Consequences
-TODO
+Shared contracts and configuration live in `packages`. The folder boundary is visible from the first commit, and later work can add implementation without restructuring the repository.

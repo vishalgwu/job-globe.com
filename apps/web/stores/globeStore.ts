@@ -1,1 +1,1 @@
-// TODO: implement client state store.
+export type GlobeStore = { zoomLevel: "world" | "country" | "city" | "job" };

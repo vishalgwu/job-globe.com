@@ -216,3 +216,16 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project virtual environment
+.venv-job-globe/
+node_modules/
+.next/
+out/
+.turbo/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.tsbuildinfo
+pytest-cache-files-*/

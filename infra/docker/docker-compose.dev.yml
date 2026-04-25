@@ -7,8 +7,50 @@ services:
       POSTGRES_DB: job_globe
     ports:
       - "5432:5432"
+    volumes:
+      - job_globe_postgres:/var/lib/postgresql/data
+      - ../../packages/database/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U job_globe -d job_globe"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.web
+    env_file:
+      - ../../.env.example
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  workers:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.workers
+    env_file:
+      - ../../.env.example
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  job_globe_postgres:

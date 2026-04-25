@@ -1,1 +1,1 @@
-// TODO: implement hook for the globe experience.
+export function useMatchScore() { return {}; }

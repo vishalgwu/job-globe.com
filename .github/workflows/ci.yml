@@ -6,13 +6,58 @@ on:
     branches: [main]
 
 jobs:
-  scaffold-check:
+  web:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Confirm scaffold exists
-        run: |
-          test -d apps/web
-          test -d apps/workers
-          test -d packages/database/migrations
-          test -d docs/decisions
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install
+      - run: npm run lint
+      - run: npm run typecheck
+
+  workers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e "apps/workers[dev]"
+      - run: ruff check apps/workers
+      - run: mypy apps/workers/src
+      - run: pytest apps/workers/tests
+
+  database:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_USER: job_globe
+          POSTGRES_PASSWORD: job_globe
+          POSTGRES_DB: job_globe
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U job_globe -d job_globe"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://job_globe:job_globe@localhost:5432/job_globe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python packages/database/scripts/validate_migrations.py packages/database/migrations
+      - run: |
+          for file in packages/database/migrations/*.sql; do
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file"
+          done
+      - run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f packages/database/seeds/taxonomy_reference.sql -f packages/database/seeds/demo_jobs.sql
+      - run: psql "$DATABASE_URL" -tAc "select count(*) from information_schema.tables where table_schema = 'public';" | grep 17

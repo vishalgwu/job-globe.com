@@ -1,9 +1,9 @@
-# Default ownership
 * @vishalgwu
-
-# Application areas
 /apps/web/ @vishalgwu
 /apps/workers/ @vishalgwu
-/packages/ @vishalgwu
+/packages/database/ @vishalgwu
+/packages/shared-types/ @vishalgwu
+/packages/config/ @vishalgwu
 /infra/ @vishalgwu
 /docs/ @vishalgwu
+/.github/ @vishalgwu

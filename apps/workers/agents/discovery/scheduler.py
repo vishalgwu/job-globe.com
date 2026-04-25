@@ -1,1 +1,1 @@
-"""Freshness-ladder timing logic for discovery connectors."""
+# Moved to apps/workers/src/job_globe_workers for package-based imports.

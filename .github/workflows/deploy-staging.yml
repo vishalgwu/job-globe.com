@@ -1,0 +1,14 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deployment-placeholder:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deployment handoff
+        run: echo "Connect this job to the selected staging platform after provider secrets are configured."

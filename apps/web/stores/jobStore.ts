@@ -1,1 +1,1 @@
-// TODO: implement client state store.
+export type JobStore = { selectedJobId: string | null };

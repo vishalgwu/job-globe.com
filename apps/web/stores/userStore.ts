@@ -1,1 +1,1 @@
-// TODO: implement client state store.
+export type UserStore = { userId: string | null };
