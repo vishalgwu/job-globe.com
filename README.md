@@ -1,4 +1,4 @@
-# Job Globe
+# job-globe.com
 
 Job Globe is a new project repository.
 
