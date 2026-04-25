@@ -1,18 +1,27 @@
 {
-  "name": "job-globe.com",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Jarvis Job Globe monorepo foundation.",
-  "workspaces": ["apps/web"],
-  "scripts": {
-    "dev": "docker compose -f infra/docker/docker-compose.dev.yml up --build",
-    "dev:web": "npm --workspace apps/web run dev",
-    "build": "npm --workspace apps/web run build",
-    "lint": "npm --workspace apps/web run lint",
-    "typecheck": "npm --workspace apps/web run typecheck",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,css,yml,yaml}\"",
-    "migration:check": "python packages/database/scripts/validate_migrations.py packages/database/migrations"
-  },
-  "devDependencies": {"prettier": "^3.3.3"},
-  "engines": {"node": ">=20.0.0", "npm": ">=10.0.0"}
+    "name":  "job-globe.com",
+    "version":  "0.1.0",
+    "private":  true,
+    "description":  "Jarvis Job Globe monorepo foundation.",
+    "workspaces":  [
+                       "apps/web"
+                   ],
+    "scripts":  {
+                    "dev":  "docker compose -f infra/docker/docker-compose.dev.yml up --build",
+                    "dev:web":  "npm --workspace apps/web run dev",
+                    "build":  "npm --workspace apps/web run build",
+                    "lint":  "npm --workspace apps/web run lint",
+                    "typecheck":  "npm --workspace apps/web run typecheck",
+                    "format:check":  "prettier --check \"**/*.{ts,tsx,js,json,md,css,yml,yaml}\"",
+                    "migration:check":  "python packages/database/scripts/validate_migrations.py packages/database/migrations",
+                    "audit:node":  "npm audit --audit-level=high",
+                    "verify:step1":  "npm run lint \u0026\u0026 npm run typecheck \u0026\u0026 npm run build \u0026\u0026 npm run migration:check"
+                },
+    "devDependencies":  {
+                            "prettier":  "^3.3.3"
+                        },
+    "engines":  {
+                    "node":  "\u003e=20.0.0",
+                    "npm":  "\u003e=10.0.0"
+                }
 }

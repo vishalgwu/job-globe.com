@@ -2,19 +2,20 @@
 
 | Requirement | Repository Status | External Status |
 | --- | --- | --- |
-| Agreed folder structure | Complete | Team access still managed in GitHub |
-| Docker Compose local environment | Compose files committed | Requires local Docker runtime |
-| 11 migrations and 17 tables | Complete, migration validator committed | Staging execution required |
-| pgvector enabled | Migration enables extension | Staging verification required |
-| Auth provider configured | Supabase config, ADR, and route shells committed | Supabase project/callbacks required |
-| CI on pull requests | Workflow committed | Branch protection must be enabled in GitHub settings |
-| Design tokens | CSS variables committed | Figma approval required |
-| UI component stubs | Six stubs committed | Step 2 implementation pending |
-| Globe dependencies | package.json includes Globe.GL, R3F, Three.js, deck.gl | Install/build verification needs npm install |
-| Python worker project | pyproject, package, venv, stubs committed | Dependency install optional locally |
-| Redis producer/consumer | Stubs committed | Runtime test requires Redis |
-| Privacy framework | Draft committed | LGL sign-off required |
-| Demo data seed | 200-job deterministic seed committed | DB execution required |
-| Wireframes | Shell boundaries and design notes committed | PO/Figma approval required |
-| Foundational ADRs | Repo, DB, globe, auth committed | PO sign-off required |
-| CODEOWNERS | Complete | GitHub usernames can be expanded later |
+| Repository initialized with agreed folder structure | Complete | Pushed to GitHub |
+| Docker Compose environment runs locally with one command | Compose config complete and validates | Docker Desktop must be running to start services |
+| All 11 migrations and 17 tables exist | Complete; validator passes | Staging execution still required |
+| pgvector enabled and functional | Migration enables pgvector and vector columns | Runtime DB verification still required |
+| Auth provider configured | Supabase config boundary, session/logout/refresh routes, and ADR committed | Supabase project/callbacks/secrets still required |
+| CI pipeline on pull requests | CI workflow committed | Branch protection must be enabled in GitHub settings |
+| Branch protection active on main | Documented in `docs/security/branch-protection.md` | Requires GitHub admin action |
+| Design token CSS variables committed | Complete | Figma/PO approval still external |
+| Six base UI stubs exist | Complete | Step 2 will flesh out behavior |
+| Globe.GL, React Three Fiber, deck.gl installed/import cleanly | Complete; import smoke passes typecheck/build | None |
+| Python worker project initialized | Complete; Ruff/Mypy/Pytest pass | None |
+| Redis Streams producer and consumer stubs exist | Complete | Runtime test needs Redis service |
+| Privacy Framework committed | Complete draft | LGL sign-off required |
+| Demo seed populates all 17 tables | 200-job seed committed | DB execution requires Docker/staging DB |
+| Wireframes approved | Shell boundaries and notes committed | PO/Figma approval required |
+| Foundational ADRs written | Repo, DB, globe, auth, embedding ADRs committed | PO sign-off required |
+| CODEOWNERS maps every folder | Complete | GitHub usernames can be expanded later |
