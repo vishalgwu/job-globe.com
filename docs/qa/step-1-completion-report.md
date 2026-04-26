@@ -41,6 +41,7 @@
 
 These items are real Step 1 handoff/admin tasks and cannot be honestly completed by only editing the repository:
 
+- Beginner-friendly completion steps are documented in `docs/qa/step-1-remaining-work-readme.md`.
 - Enable GitHub branch protection on `main`: require PR review, require CI, block force push, block deletion.
 - Configure Supabase project, auth callback URLs, JWT/session settings, and staging secrets.
 - Run migrations and demo seed against the staging database and capture the `\dt` verification output.
