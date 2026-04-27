@@ -1,11 +1,5 @@
-import { GlobeCanvas } from "../../components/globe/GlobeCanvas/GlobeCanvas";
-import { JobPanel } from "../../components/job-panel/JobPanel/JobPanel";
+import { GlobeExperience } from "../../components/globe/GlobeExperience/GlobeExperience";
 
 export default function GlobePage() {
-  return (
-    <main style={{ display: "grid", minHeight: "100vh", gridTemplateColumns: "1fr 380px" }}>
-      <GlobeCanvas />
-      <JobPanel />
-    </main>
-  );
+  return <GlobeExperience />;
 }
