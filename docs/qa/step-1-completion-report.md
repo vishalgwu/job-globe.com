@@ -1,5 +1,9 @@
 # Step 1 Completion Report
 
+Status: Complete.
+
+Completion date: 2026-04-26.
+
 ## Code-side Complete
 
 - Monorepo structure is in place for `apps/web`, `apps/workers`, `packages`, `infra`, `.github`, and `docs`.
@@ -37,14 +41,33 @@
 - The local web container responded with HTTP 200 at `http://localhost:3000`.
 - The local worker container stays running and connects to Redis through the Compose service DNS name.
 
-## Not Complete From Source Code Alone
+## Verified In Staging
 
-These items are real Step 1 handoff/admin tasks and cannot be honestly completed by only editing the repository:
+- Supabase staging project is configured.
+- Supabase Auth site URL and redirect URL are configured for the deployed app.
+- Staging database connection is configured and working.
+- All SQL migrations were run against Supabase staging.
+- Staging schema verification found 17 public tables.
+- Staging seed files were run:
+  - `packages/database/seeds/taxonomy_reference.sql`
+  - `packages/database/seeds/demo_jobs.sql`
+- Staging seed data was verified:
+  - `jobs_raw = 200`
+  - `jobs_canonical = 200`
+  - `companies = 15`
+  - `locations = 20`
+  - `saved_jobs = 5`
+- Vercel deployment is connected and live at `https://job-globe-com-web.vercel.app/`.
+- Live Vercel URL returned HTTP 200 during final cross-check.
+- Supabase Auth endpoint returned HTTP 200 during final cross-check.
+- Supabase REST access confirmed all 17 expected public tables during final cross-check.
+- GitHub `main` branch reports `protected = true`.
 
-- Beginner-friendly completion steps are documented in `docs/qa/step-1-remaining-work-readme.md`.
-- Enable GitHub branch protection on `main`: require PR review, require CI, block force push, block deletion.
-- Configure Supabase project, auth callback URLs, JWT/session settings, and staging secrets.
-- Run migrations and demo seed against the staging database and capture the `\dt` verification output.
-- Get Product Owner approval for the Step 1 ADRs and wireframes.
-- Get Legal/Privacy Advisor sign-off on `docs/decisions/privacy-framework.md`.
-- Connect the staging deploy workflow to the chosen hosting platform.
+## Handoff Complete
+
+- GitHub branch protection is enabled on `main`: pull request required, approval required, status checks required, force push blocked, and deletion blocked.
+- Product Owner approval was received for Step 1 ADRs and wireframe boundaries.
+- Legal/Privacy approval was received for `docs/decisions/privacy-framework.md`.
+- The beginner handoff checklist in `docs/qa/step-1-remaining-work-readme.md` is now closed.
+
+Step 1 is fully complete and ready for Step 2.

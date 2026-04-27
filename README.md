@@ -36,8 +36,16 @@ Shared logic belongs in `packages`; application folders do not import directly f
 ## Step 1 Verification
 
 ```powershell
-npm.cmd run migration:check
-.\.venv-job-globe\Scripts\python.exe -m compileall apps\workers\src
+npm.cmd run verify:step1
+.\.venv-job-globe\Scripts\python.exe -m ruff check apps\workers
+.\.venv-job-globe\Scripts\python.exe -m mypy apps\workers\src
+.\.venv-job-globe\Scripts\python.exe -m pytest -p no:cacheprovider apps\workers\tests
 ```
 
-Provider-level tasks still required outside the repository: enable GitHub branch protection for `main`, create staging secrets, connect Supabase Auth, and obtain Legal/Privacy sign-off on the privacy framework.
+Step 1 is complete. The repository baseline, local Docker baseline, Supabase staging database, Vercel deployment, GitHub branch protection, Product Owner approval, and Legal/Privacy approval are recorded in `docs/qa/step-1-completion-report.md`.
+
+Live deployment:
+
+```text
+https://job-globe-com-web.vercel.app/
+```

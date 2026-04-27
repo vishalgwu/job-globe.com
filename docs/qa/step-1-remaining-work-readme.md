@@ -1,21 +1,50 @@
-# Step 1 Remaining Work README
+# Step 1 Handoff Completion README
 
-This guide explains what is still left after Step 1 and how an intern can help finish the handoff.
+Status: Complete.
+
+Completion date: 2026-04-26.
+
+This file was originally the beginner checklist for the external Step 1 handoff. All items are now complete.
 
 Step 1 code work is complete locally. Docker was also checked locally: PostgreSQL, Redis, web, and workers run; migrations create 17 tables; demo seed data loads; the web app returns HTTP 200.
 
-The remaining tasks are outside the source code. They need account access, approvals, or staging provider setup.
+The external setup work is also complete: Supabase staging, Vercel deployment, GitHub branch protection, Product Owner approval, and Legal/Privacy approval are done.
 
 ## Quick Checklist
 
 | Task | Who Usually Does It | Status |
 | --- | --- | --- |
-| Enable GitHub branch protection on `main` | Repository admin | Not done |
-| Configure Supabase project, secrets, and auth callbacks | Backend/devops owner | Not done |
-| Connect staging deployment provider | Devops owner | Not done |
-| Run migrations and seeds against staging database | Backend/devops owner | Not done |
-| Get Product Owner approval for ADRs and wireframes | Product Owner | Not done |
-| Get Legal/Privacy sign-off on privacy framework | Legal/Privacy reviewer | Not done |
+| Enable GitHub branch protection on `main` | Repository admin | Done |
+| Configure Supabase project, secrets, and auth callbacks | Backend/DevOps owner | Done |
+| Connect staging deployment provider | DevOps owner | Done |
+| Run migrations and seeds against staging database | Backend/DevOps owner | Done |
+| Get Product Owner approval for ADRs and wireframes | Product Owner | Done |
+| Get Legal/Privacy sign-off on privacy framework | Legal/Privacy reviewer | Done |
+
+## Final Verification Summary
+
+- Supabase staging database connection configured and working.
+- All SQL migrations ran on Supabase staging.
+- Supabase staging schema verified with 17 public tables.
+- Seed files ran on Supabase staging:
+  - `taxonomy_reference.sql`
+  - `demo_jobs.sql`
+- Seed data verified:
+  - `jobs_raw = 200`
+  - `jobs_canonical = 200`
+  - `companies = 15`
+  - `locations = 20`
+  - `saved_jobs = 5`
+- GitHub branch protection is enabled on `main`.
+- Vercel deployment is connected and live at `https://job-globe-com-web.vercel.app/`.
+- Supabase Auth site URL and redirect URL are configured.
+- Product Owner approval received.
+- Legal/Privacy approval received.
+- Final verification passed:
+  - `npm.cmd run verify:step1`
+  - `.venv-job-globe\Scripts\python.exe -m ruff check apps\workers`
+  - `.venv-job-globe\Scripts\python.exe -m mypy apps\workers\src`
+  - `.venv-job-globe\Scripts\python.exe -m pytest -p no:cacheprovider apps\workers\tests`
 
 ## Before You Start
 
