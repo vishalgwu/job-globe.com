@@ -15,7 +15,10 @@ All modes accept optional filters:
 | `city`         | City name                                           |
 | `remote`       | `remote`, `hybrid`, `on-site`                       |
 | `jobType`      | `internship`, `new-grad`, `full-time`, `contract`   |
+| `postedWithin` | `1hr`, `6hr`, `1day`, `7day`, `past-month`          |
 | `q` or `query` | Free-text demo search                               |
+
+If `postedWithin` is omitted, the API behaves as `any-time` and does not apply a time filter.
 
 ### `mode=global`
 
@@ -64,6 +67,9 @@ Returns filtered job summaries for the panel/list mode.
 {
   "mode": "jobs",
   "source": "demo",
+  "filters": {
+    "postedWithin": "any-time"
+  },
   "jobs": []
 }
 ```

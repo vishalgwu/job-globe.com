@@ -6,6 +6,8 @@ export type RemoteMode = "remote" | "hybrid" | "on-site";
 
 export type JobType = "internship" | "new-grad" | "full-time" | "contract";
 
+export type PostedWithin = "1hr" | "6hr" | "1day" | "7day" | "past-month" | "any-time";
+
 export interface SalaryRange {
   min: number | null;
   max: number | null;
@@ -33,6 +35,7 @@ export interface SearchFilters {
   city: string | null;
   remoteMode: RemoteMode | null;
   jobType: JobType | null;
+  postedWithin: PostedWithin;
   query: string | null;
 }
 
@@ -92,6 +95,7 @@ export interface JobSummary {
   employmentType: JobType;
   remoteMode: RemoteMode;
   salaryRange: SalaryRange | null;
+  postedAt: string;
   postedDate: string;
   freshness: "fresh" | "active" | "stale";
   summary: string;

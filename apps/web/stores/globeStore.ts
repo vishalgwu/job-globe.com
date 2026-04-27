@@ -33,6 +33,7 @@ const defaultFilters: SearchFilters = {
   city: null,
   remoteMode: null,
   jobType: null,
+  postedWithin: "any-time",
   query: null,
 };
 

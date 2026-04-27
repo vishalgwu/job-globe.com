@@ -270,6 +270,7 @@ function toQueryString(filters: {
   city: string | null;
   remoteMode: string | null;
   jobType: string | null;
+  postedWithin: string;
   query: string | null;
 }): string {
   const params = new URLSearchParams();
@@ -292,6 +293,10 @@ function toQueryString(filters: {
 
   if (filters.jobType) {
     params.set("jobType", filters.jobType);
+  }
+
+  if (filters.postedWithin !== "any-time") {
+    params.set("postedWithin", filters.postedWithin);
   }
 
   if (filters.query) {

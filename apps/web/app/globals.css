@@ -217,7 +217,7 @@ a:hover {
   border-radius: var(--radius-md);
   display: grid;
   gap: var(--space-sm);
-  grid-template-columns: minmax(220px, 2fr) repeat(4, minmax(140px, 1fr));
+  grid-template-columns: minmax(220px, 2fr) repeat(5, minmax(140px, 1fr));
   padding: var(--space-md);
 }
 

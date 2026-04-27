@@ -16,6 +16,7 @@ EXPECTED_FILES = [
     "009_alerts.sql",
     "010_agent_runs.sql",
     "011_audit_events.sql",
+    "012_job_time_filter_indexes.sql",
 ]
 EXPECTED_TABLES = {
     "users", "auth_sessions", "profiles", "resume_extractions", "companies", "locations",
@@ -44,7 +45,10 @@ def main(migrations_dir: str) -> int:
     if "USING GIN" not in sql:
         print("Expected GIN indexes are missing")
         return 1
-    print("Migration validation passed: 11 files, 17 tables, pgvector, and GIN indexes present.")
+    if "idx_jobs_canonical_status_first_seen_at" not in sql:
+        print("Expected jobs_canonical time-filter index is missing")
+        return 1
+    print("Migration validation passed: 12 files, 17 tables, pgvector, and GIN indexes present.")
     return 0
 
 

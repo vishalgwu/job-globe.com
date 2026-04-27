@@ -8,6 +8,7 @@ import type {
   JobSummary,
   JobType,
   JobsApiMode,
+  PostedWithin,
   RemoteMode,
   SearchFilters,
 } from "@job-globe/shared-types";
@@ -15,6 +16,14 @@ import type {
 const remoteModes: RemoteMode[] = ["remote", "hybrid", "on-site"];
 const jobTypes: JobType[] = ["internship", "new-grad", "full-time", "contract"];
 const apiModes: JobsApiMode[] = ["global", "country", "city", "jobs", "detail"];
+const postedWithinOptions: PostedWithin[] = [
+  "1hr",
+  "6hr",
+  "1day",
+  "7day",
+  "past-month",
+  "any-time",
+];
 
 export const demoJobs: JobDetail[] = [
   {
@@ -36,7 +45,8 @@ export const demoJobs: JobDetail[] = [
     employmentType: "full-time",
     remoteMode: "hybrid",
     salaryRange: { min: 118000, max: 154000, currency: "USD" },
-    postedDate: "2026-04-20",
+    postedAt: isoHoursAgo(0.5),
+    postedDate: dateHoursAgo(0.5),
     freshness: "fresh",
     summary: "Build fast product surfaces for the globe search experience and shared UI systems.",
     applyUrl: "https://careers.example.com/aster-labs/frontend-platform-engineer",
@@ -83,7 +93,8 @@ export const demoJobs: JobDetail[] = [
     employmentType: "internship",
     remoteMode: "hybrid",
     salaryRange: { min: 42, max: 55, currency: "USD" },
-    postedDate: "2026-04-18",
+    postedAt: isoHoursAgo(4),
+    postedDate: dateHoursAgo(4),
     freshness: "fresh",
     summary: "Prototype ranking features for demo job search and profile matching workflows.",
     applyUrl: "https://careers.example.com/cloudbridge-ai/ml-intern",
@@ -129,7 +140,8 @@ export const demoJobs: JobDetail[] = [
     employmentType: "new-grad",
     remoteMode: "remote",
     salaryRange: { min: 82000, max: 98000, currency: "CAD" },
-    postedDate: "2026-04-12",
+    postedAt: isoHoursAgo(20),
+    postedDate: dateHoursAgo(20),
     freshness: "active",
     summary: "Turn demo job market activity into city and company-level insights.",
     applyUrl: "https://careers.example.com/datum-works/data-analyst-marketplace-signals",
@@ -175,7 +187,8 @@ export const demoJobs: JobDetail[] = [
     employmentType: "contract",
     remoteMode: "remote",
     salaryRange: { min: 450, max: 650, currency: "GBP" },
-    postedDate: "2026-04-05",
+    postedAt: isoHoursAgo(24 * 6),
+    postedDate: dateHoursAgo(24 * 6),
     freshness: "active",
     summary: "Design compact filtering and right-panel workflows for demo job discovery.",
     applyUrl: "https://careers.example.com/juniper-learning/search-product-designer",
@@ -221,7 +234,8 @@ export const demoJobs: JobDetail[] = [
     employmentType: "full-time",
     remoteMode: "on-site",
     salaryRange: { min: 76000, max: 102000, currency: "EUR" },
-    postedDate: "2026-03-30",
+    postedAt: isoHoursAgo(24 * 20),
+    postedDate: dateHoursAgo(24 * 20),
     freshness: "active",
     summary: "Review demo source trust, redirect safety, and profile data handling controls.",
     applyUrl: "https://careers.example.com/northstar-security/security-review-analyst",
@@ -267,7 +281,8 @@ export const demoJobs: JobDetail[] = [
     employmentType: "full-time",
     remoteMode: "on-site",
     salaryRange: { min: 72000, max: 92000, currency: "SGD" },
-    postedDate: "2026-04-08",
+    postedAt: isoHoursAgo(24 * 45),
+    postedDate: dateHoursAgo(24 * 45),
     freshness: "active",
     summary: "Coordinate hiring operations and demo cluster workflows across regional teams.",
     applyUrl: "https://careers.example.com/orbit-supply/operations-coordinator",
@@ -308,6 +323,7 @@ export function parseSearchFilters(searchParams: URLSearchParams): SearchFilters
     city: emptyToNull(searchParams.get("city")),
     remoteMode: parseRemoteMode(searchParams.get("remote")),
     jobType: parseJobType(searchParams.get("jobType")),
+    postedWithin: parsePostedWithin(searchParams.get("postedWithin")),
     query: emptyToNull(searchParams.get("q") ?? searchParams.get("query")),
   };
 }
@@ -438,6 +454,10 @@ function filteredJobs(filters: SearchFilters): JobDetail[] {
       return false;
     }
 
+    if (!isWithinPostedWindow(job.postedAt, filters.postedWithin)) {
+      return false;
+    }
+
     if (filters.query) {
       const haystack = [
         job.title,
@@ -479,6 +499,51 @@ function parseJobType(value: string | null): JobType | null {
   return jobTypes.includes(value as JobType) ? (value as JobType) : null;
 }
 
+function parsePostedWithin(value: string | null): PostedWithin {
+  const normalizedValue = emptyToNull(value)?.toLowerCase().replace(/\s+/g, "-") ?? "any-time";
+
+  if (normalizedValue === "month" || normalizedValue === "30day" || normalizedValue === "30days") {
+    return "past-month";
+  }
+
+  return postedWithinOptions.includes(normalizedValue as PostedWithin)
+    ? (normalizedValue as PostedWithin)
+    : "any-time";
+}
+
+function isWithinPostedWindow(postedAt: string, postedWithin: PostedWithin): boolean {
+  if (postedWithin === "any-time") {
+    return true;
+  }
+
+  const postedAtMs = Date.parse(postedAt);
+  if (Number.isNaN(postedAtMs)) {
+    return false;
+  }
+
+  return Date.now() - postedAtMs <= postedWindowMs(postedWithin);
+}
+
+function postedWindowMs(postedWithin: Exclude<PostedWithin, "any-time">): number {
+  if (postedWithin === "1hr") {
+    return 60 * 60 * 1000;
+  }
+
+  if (postedWithin === "6hr") {
+    return 6 * 60 * 60 * 1000;
+  }
+
+  if (postedWithin === "1day") {
+    return 24 * 60 * 60 * 1000;
+  }
+
+  if (postedWithin === "7day") {
+    return 7 * 24 * 60 * 60 * 1000;
+  }
+
+  return 30 * 24 * 60 * 60 * 1000;
+}
+
 function topBreakdown(values: string[], limit: number): GlobeMetricBreakdown[] {
   const counts = new Map<string, number>();
 
@@ -512,4 +577,12 @@ function formatSalaryRange(salaryRange: JobDetail["salaryRange"]): string | null
   }
 
   return `${salaryRange.currency} ${salaryRange.min.toLocaleString()}-${salaryRange.max.toLocaleString()}`;
+}
+
+function isoHoursAgo(hoursAgo: number): string {
+  return new Date(Date.now() - hoursAgo * 60 * 60 * 1000).toISOString();
+}
+
+function dateHoursAgo(hoursAgo: number): string {
+  return isoHoursAgo(hoursAgo).slice(0, 10);
 }

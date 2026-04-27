@@ -1,6 +1,6 @@
 "use client";
 
-import type { JobType, RemoteMode, SearchFilters } from "@job-globe/shared-types";
+import type { JobType, PostedWithin, RemoteMode, SearchFilters } from "@job-globe/shared-types";
 
 const categories = [
   "software-engineering",
@@ -22,6 +22,14 @@ const countries = [
 
 const remoteModes: RemoteMode[] = ["remote", "hybrid", "on-site"];
 const jobTypes: JobType[] = ["internship", "new-grad", "full-time", "contract"];
+const postedWithinOptions: { label: string; value: PostedWithin }[] = [
+  { label: "Any time", value: "any-time" },
+  { label: "Past 1hr", value: "1hr" },
+  { label: "Past 6hr", value: "6hr" },
+  { label: "Past 1day", value: "1day" },
+  { label: "Past 7day", value: "7day" },
+  { label: "Past month", value: "past-month" },
+];
 
 interface FilterBarProps {
   filters: SearchFilters;
@@ -82,6 +90,19 @@ export function FilterBar({ filters, searchText, onFilterChange, onSearchChange 
           {remoteModes.map((mode) => (
             <option key={mode} value={mode}>
               {formatLabel(mode)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="field-control">
+        <span>Posted</span>
+        <select
+          value={filters.postedWithin}
+          onChange={(event) => onFilterChange({ postedWithin: event.target.value as PostedWithin })}
+        >
+          {postedWithinOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
         </select>
