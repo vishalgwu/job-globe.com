@@ -16,13 +16,14 @@ interface ZoomControllerProps {
 
 export function ZoomController({ activeLayer, onLayerChange }: ZoomControllerProps) {
   return (
-    <div className="zoom-controller" aria-label="Globe zoom layer">
+    <div className="layer-switcher" role="tablist" aria-label="Map layer selector">
       {layers.map((layer) => (
         <button
           key={layer.value}
-          className={layer.value === activeLayer ? "is-active" : undefined}
+          role="tab"
           type="button"
-          aria-pressed={layer.value === activeLayer}
+          aria-selected={layer.value === activeLayer}
+          data-layer={layer.value}
           onClick={() => onLayerChange(layer.value)}
         >
           {layer.label}

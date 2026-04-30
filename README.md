@@ -5,7 +5,7 @@ Job Globe is structured as a monorepo for the Jarvis Job Globe build plan.
 ## One-command Local Environment
 
 ```powershell
-copy .env.example .env.local
+copy .env.example .env
 npm.cmd install
 npm.cmd run dev
 ```

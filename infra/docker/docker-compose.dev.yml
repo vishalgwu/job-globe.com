@@ -31,7 +31,7 @@ services:
       context: ../..
       dockerfile: infra/docker/Dockerfile.web
     env_file:
-      - ../../.env.example
+      - ../../.env
     environment:
       DATABASE_URL: postgresql://job_globe:job_globe@postgres:5432/job_globe
       REDIS_URL: redis://redis:6379/0
@@ -48,7 +48,7 @@ services:
       context: ../..
       dockerfile: infra/docker/Dockerfile.workers
     env_file:
-      - ../../.env.example
+      - ../../.env
     environment:
       DATABASE_URL: postgresql://job_globe:job_globe@postgres:5432/job_globe
       REDIS_URL: redis://redis:6379/0

@@ -10,7 +10,7 @@ export function ApplyCTA({ applyUrl }: ApplyCTAProps) {
   }
 
   return (
-    <a className="primary-action apply-cta" href={applyUrl} target="_blank" rel="noreferrer">
+    <a className="primary-cta apply-cta" href={applyUrl} target="_blank" rel="noreferrer">
       Apply on Official Site
     </a>
   );

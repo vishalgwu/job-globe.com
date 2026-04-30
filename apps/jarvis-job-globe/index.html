@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Jarvis Job Globe</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="command-bar" aria-label="Job search controls">
+        <div class="brand-block">
+          <div class="brand-mark" aria-hidden="true">JG</div>
+          <div>
+            <p class="eyebrow">Jarvis Job Globe</p>
+            <h1>Global hiring intelligence</h1>
+          </div>
+        </div>
+
+        <form class="search-rack" id="filterForm">
+          <label class="search-field">
+            <span class="visually-hidden">Search jobs</span>
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="m21 21-4.3-4.3m1.3-5.2a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z"></path>
+            </svg>
+            <input id="searchInput" name="q" type="search" autocomplete="off" placeholder="Search roles, skills, or companies">
+          </label>
+
+          <label>
+            <span>Category</span>
+            <select id="categoryFilter" name="category">
+              <option value="all">All</option>
+              <option>AI / ML</option>
+              <option>Cloud</option>
+              <option>Cybersecurity</option>
+              <option>Data</option>
+              <option>Design</option>
+              <option>Product</option>
+              <option>Software</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Place</span>
+            <select id="placeFilter" name="place">
+              <option value="global">Global</option>
+              <option value="US">United States</option>
+              <option value="GB">United Kingdom</option>
+              <option value="DE">Germany</option>
+              <option value="IN">India</option>
+              <option value="SG">Singapore</option>
+              <option value="AU">Australia</option>
+              <option value="CA">Canada</option>
+              <option value="BR">Brazil</option>
+              <option value="JP">Japan</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Remote</span>
+            <select id="remoteFilter" name="remote">
+              <option value="all">All</option>
+              <option>Remote</option>
+              <option>Hybrid</option>
+              <option>On-site</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Type</span>
+            <select id="typeFilter" name="type">
+              <option value="all">All</option>
+              <option>Full-time</option>
+              <option>Contract</option>
+              <option>Internship</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Posted</span>
+            <select id="postedWithinFilter" name="postedWithin">
+              <option value="">Any time</option>
+              <option value="1h">Past 1 hour</option>
+              <option value="6h">Past 6 hours</option>
+              <option value="1d">Past 1 day</option>
+              <option value="7d">Past 7 days</option>
+              <option value="30d">Past month</option>
+            </select>
+          </label>
+        </form>
+
+        <div class="view-actions" aria-label="View options">
+          <button class="icon-button" id="fallbackToggle" type="button" aria-pressed="false" title="Toggle 2D fallback map">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M9 18 3 15V5l6 3m0 10 6-3m-6 3V8m6 7 6 3V8l-6-3m0 10V5M9 8l6-3"></path>
+            </svg>
+            <span>2D</span>
+          </button>
+          <button class="icon-button" id="listModeToggle" type="button" aria-pressed="false" title="Toggle screen-reader list mode">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path>
+            </svg>
+            <span>List</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="experience-grid">
+        <aside class="intel-panel" aria-label="Selected geography summary">
+          <section>
+            <p class="eyebrow">Live layer</p>
+            <div class="layer-switcher" role="tablist" aria-label="Map layer selector">
+              <button role="tab" aria-selected="true" data-layer="global">Global</button>
+              <button role="tab" aria-selected="false" data-layer="country">Country</button>
+              <button role="tab" aria-selected="false" data-layer="city">City</button>
+              <button role="tab" aria-selected="false" data-layer="neighbourhood">Neighbourhood</button>
+            </div>
+          </section>
+
+          <section class="summary-block" id="summaryBlock">
+            <p class="eyebrow">Demand summary</p>
+            <h2 id="summaryTitle">Global hiring demand</h2>
+            <p id="summaryCopy">Explore country-level density, then zoom into metros, companies, and precise openings.</p>
+            <div class="metric-grid">
+              <div>
+                <strong id="summaryJobs">593k</strong>
+                <span>open roles</span>
+              </div>
+              <div>
+                <strong id="summaryVelocity">+14%</strong>
+                <span>7 day velocity</span>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <p class="eyebrow">Top categories</p>
+            <div class="chip-stack" id="categoryChips"></div>
+          </section>
+
+          <section>
+            <p class="eyebrow">Top metros</p>
+            <ol class="metro-list" id="metroList"></ol>
+          </section>
+
+          <section class="endpoint-readout">
+            <span>Data route</span>
+            <code id="endpointText">/api/jobs?mode=global</code>
+          </section>
+        </aside>
+
+        <section class="map-viewport" aria-label="Interactive job globe">
+          <canvas id="ambientCanvas" aria-hidden="true"></canvas>
+          <div class="zoom-controls" aria-label="Map zoom controls">
+            <button id="zoomOutButton" type="button" aria-label="Zoom out">&minus;</button>
+            <button id="zoomResetButton" type="button" aria-label="Reset zoom">100%</button>
+            <button id="zoomInButton" type="button" aria-label="Zoom in">+</button>
+          </div>
+          <div class="map-status">
+            <span id="breadcrumbText">Global demand layer</span>
+            <strong id="resultCount">0 plotted signals</strong>
+          </div>
+          <div class="map-stage is-3d" id="mapStage">
+            <div class="globe-frame" aria-hidden="true">
+              <div class="globe-halo"></div>
+              <div class="globe-core">
+                <div class="cloud-band"></div>
+                <div class="contour contour-a"></div>
+                <div class="contour contour-b"></div>
+                <div class="map-texture"></div>
+              </div>
+            </div>
+            <div class="flat-map" aria-hidden="true"></div>
+            <div class="marker-layer" id="markerLayer"></div>
+          </div>
+
+          <div class="legend-bar" aria-label="Hiring density legend">
+            <span>Hiring density</span>
+            <div class="legend-ramp" aria-hidden="true"></div>
+            <span>Low</span>
+            <span>High</span>
+          </div>
+
+          <div class="jobs-list-panel" id="jobsListPanel" aria-live="polite">
+            <div class="list-panel-head">
+              <h2>Accessible job list</h2>
+              <button type="button" id="closeListButton">Close</button>
+            </div>
+            <div id="jobsList"></div>
+          </div>
+        </section>
+
+        <aside class="job-panel" id="jobPanel" aria-label="Selected job details">
+          <div class="empty-state" id="emptyJobState">
+            <p class="eyebrow">No marker selected</p>
+            <h2>Select a job or company signal</h2>
+            <p>Openings, companies, and city bubbles will reveal role context, salary hints, and prep intelligence here.</p>
+          </div>
+
+          <article class="job-detail" id="jobDetail" hidden>
+            <button class="close-panel" id="closePanelButton" type="button" aria-label="Close job panel">&times;</button>
+            <p class="eyebrow" id="detailFreshness">Fresh</p>
+            <h2 id="detailTitle"></h2>
+            <p class="detail-company" id="detailCompany"></p>
+            <div class="detail-tags" id="detailTags"></div>
+            <p class="detail-summary" id="detailSummary"></p>
+
+            <div class="action-row">
+              <a class="primary-cta" id="applyLink" href="#" target="_blank" rel="noreferrer">Apply on Official Site</a>
+              <button class="secondary-cta" id="saveJobButton" type="button">Save Job</button>
+            </div>
+
+            <section class="match-block">
+              <p class="eyebrow">Match explanation</p>
+              <p id="matchCopy">Placeholder: Jarvis will explain skill overlap, location fit, salary fit, and missing requirements once profile data is connected.</p>
+            </section>
+
+            <details open>
+              <summary>Quick-prep</summary>
+              <ul id="prepList"></ul>
+            </details>
+          </article>
+        </aside>
+      </main>
+    </div>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>

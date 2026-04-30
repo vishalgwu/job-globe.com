@@ -6,7 +6,7 @@ interface QuickPrepToolkitProps {
 
 export function QuickPrepToolkit({ quickPrep }: QuickPrepToolkitProps) {
   return (
-    <section className="panel-section" aria-labelledby="quick-prep-title">
+    <section className="quick-prep" aria-labelledby="quick-prep-title">
       <h3 id="quick-prep-title">Quick Prep</h3>
       <details open>
         <summary>Role summary</summary>
