@@ -41,7 +41,8 @@ Evidence in this workspace:
 | Owner | `vishalgwu` |
 | Environment | Production |
 | Branch | `main` |
-| Latest commit | `1a54391` (`Update globe UI and deployment inventory`) |
+| Latest application-change commit | `1a54391` (`Update globe UI and deployment inventory`) |
+| Repository branch tip | `main`; verify with `git rev-parse origin/main` after each push |
 | Deployment status | Ready |
 | App | `apps/web` |
 | Framework | Next.js |
