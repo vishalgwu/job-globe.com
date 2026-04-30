@@ -41,7 +41,7 @@ Evidence in this workspace:
 | Owner | `vishalgwu` |
 | Environment | Production |
 | Branch | `main` |
-| Latest commit | `2774cbd` (`Add job posted time filter`) |
+| Latest commit | `1a54391` (`Update globe UI and deployment inventory`) |
 | Deployment status | Ready |
 | App | `apps/web` |
 | Framework | Next.js |
