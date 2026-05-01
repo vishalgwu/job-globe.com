@@ -120,36 +120,37 @@ export interface JobDetail extends JobSummary {
 }
 
 export type JobsApiMode = "global" | "country" | "city" | "jobs" | "detail";
+export type JobsApiSource = "supabase";
 
 export type JobsApiResponse =
   | {
       mode: "global";
-      source: "demo";
+      source: JobsApiSource;
       filters: SearchFilters;
       countries: GlobeCountryDatum[];
     }
   | {
       mode: "country";
-      source: "demo";
+      source: JobsApiSource;
       filters: SearchFilters;
       country: GlobeCountryDatum | null;
       cities: GlobeCityDatum[];
     }
   | {
       mode: "city";
-      source: "demo";
+      source: JobsApiSource;
       filters: SearchFilters;
       bubbles: GlobeCompanyBubble[];
       markers: GlobeMarker[];
     }
   | {
       mode: "jobs";
-      source: "demo";
+      source: JobsApiSource;
       filters: SearchFilters;
       jobs: JobSummary[];
     }
   | {
       mode: "detail";
-      source: "demo";
+      source: JobsApiSource;
       job: JobDetail;
     };

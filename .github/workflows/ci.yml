@@ -14,9 +14,10 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm install
+      - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm run build
 
   workers:
     runs-on: ubuntu-latest
@@ -51,13 +52,21 @@ jobs:
       DATABASE_URL: postgresql://job_globe:job_globe@localhost:5432/job_globe
     steps:
       - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - run: python packages/database/scripts/validate_migrations.py packages/database/migrations
-      - run: |
-          for file in packages/database/migrations/*.sql; do
-            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file"
-          done
+      - run: python packages/database/scripts/apply_migrations.py packages/database/migrations
       - run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f packages/database/seeds/taxonomy_reference.sql -f packages/database/seeds/demo_jobs.sql
-      - run: psql "$DATABASE_URL" -tAc "select count(*) from information_schema.tables where table_schema = 'public';" | grep 17
+      - run: |
+          psql "$DATABASE_URL" -tAc "
+            select count(*)
+            from information_schema.tables
+            where table_schema = 'public'
+              and table_name <> 'schema_migrations';
+          " | grep 17
+      - run: psql "$DATABASE_URL" -tAc "select count(*) from schema_migrations;" | grep 12

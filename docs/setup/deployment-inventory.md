@@ -25,6 +25,7 @@ This document records provider metadata that can be safely committed. Do not pas
 | Database URL variable | `DATABASE_URL` is set in the private root `.env` with the Supabase pooler password |
 | Migration status | All SQL migrations were run against Supabase staging |
 | Schema verification | 17 public tables were confirmed |
+| Migration history | Tracked in `public.schema_migrations` by `packages/database/scripts/apply_migrations.py` |
 
 Evidence in this workspace:
 
@@ -61,6 +62,7 @@ Evidence in this workspace:
 - `.env.example` is the safe committed template.
 - Docker Compose uses `.env` for local web and worker containers.
 - Staging and production secrets should be set in Vercel, Supabase, GitHub Actions, or the chosen managed secret store.
+- Vercel deployment verification is documented in `docs/runbooks/vercel-deployment.md`.
 
 ## Still Needed
 
