@@ -1,31 +1,32 @@
 # Deployment Inventory
 
-Last updated: 2026-04-30
+Last updated: 2026-05-01
 
 This document records provider metadata that can be safely committed. Do not paste API keys, service role keys, passwords, database URLs with credentials, or storage secrets into this file.
 
 ## Supabase
 
-| Field | Value |
-| --- | --- |
-| Project name | `job-globe-staging` |
-| Project ID / ref | `mqfiocolakvqkpvxlafk` |
-| Project URL | `https://mqfiocolakvqkpvxlafk.supabase.co` |
-| Region | `us-east-1` |
-| Environment | Staging |
-| Auth provider | Supabase |
-| Connection type | PostgreSQL pooler |
-| Database host | `aws-1-us-east-1.pooler.supabase.com` |
-| Database port | `6543` |
-| Database name | `postgres` |
-| Database user | `postgres.mqfiocolakvqkpvxlafk` |
-| Required public variable | `NEXT_PUBLIC_SUPABASE_URL` |
-| Required public key variable | `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
-| Required server key variable | `SUPABASE_SERVICE_ROLE_KEY` |
-| Database URL variable | `DATABASE_URL` is set in the private root `.env` with the Supabase pooler password |
-| Migration status | All SQL migrations were run against Supabase staging |
-| Schema verification | 17 public tables were confirmed |
-| Migration history | Tracked in `public.schema_migrations` by `packages/database/scripts/apply_migrations.py` |
+| Field                        | Value                                                                                    |
+| ---------------------------- | ---------------------------------------------------------------------------------------- |
+| Project name                 | `job-globe-staging`                                                                      |
+| Project ID / ref             | `mqfiocolakvqkpvxlafk`                                                                   |
+| Project URL                  | `https://mqfiocolakvqkpvxlafk.supabase.co`                                               |
+| Region                       | `us-east-1`                                                                              |
+| Environment                  | Staging                                                                                  |
+| Auth provider                | Supabase                                                                                 |
+| Connection type              | PostgreSQL pooler                                                                        |
+| Database host                | `aws-1-us-east-1.pooler.supabase.com`                                                    |
+| Database port                | `6543`                                                                                   |
+| Database name                | `postgres`                                                                               |
+| Database user                | `postgres.mqfiocolakvqkpvxlafk`                                                          |
+| Required public variable     | `NEXT_PUBLIC_SUPABASE_URL`                                                               |
+| Required public key variable | `NEXT_PUBLIC_SUPABASE_ANON_KEY`                                                          |
+| Required server key variable | `SUPABASE_SERVICE_ROLE_KEY`                                                              |
+| Database URL variable        | `DATABASE_URL` is set in the private root `.env` with the Supabase pooler password       |
+| Migration status             | All SQL migrations were run against Supabase staging                                     |
+| Schema verification          | 17 public tables were confirmed                                                          |
+| Migration history            | Tracked in `public.schema_migrations` by `packages/database/scripts/apply_migrations.py` |
+| Production health status     | `/api/health` returns HTTP 200 with Supabase jobs and migrations checks passing          |
 
 Evidence in this workspace:
 
@@ -35,26 +36,28 @@ Evidence in this workspace:
 
 ## Vercel
 
-| Field | Value |
-| --- | --- |
-| Production URL | `https://job-globe-com-web.vercel.app/` |
-| Project name | `job-globe-com-web` |
-| Owner | `vishalgwu` |
-| Environment | Production |
-| Branch | `main` |
-| Latest application-change commit | `1a54391` (`Update globe UI and deployment inventory`) |
-| Repository branch tip | `main`; verify with `git rev-parse origin/main` after each push |
-| Deployment status | Ready |
-| App | `apps/web` |
-| Framework | Next.js |
-| Expected install command | `npm install` |
-| Expected build command | `npm --workspace apps/web run build` |
-| Expected output | Next.js managed output |
+| Field                            | Value                                                           |
+| -------------------------------- | --------------------------------------------------------------- |
+| Production URL                   | `https://job-globe-com-web.vercel.app/`                         |
+| Project name                     | `job-globe-com-web`                                             |
+| Owner                            | `vishalgwu`                                                     |
+| Environment                      | Production                                                      |
+| Branch                           | `main`                                                          |
+| Latest application-change commit | `8318734` (`Wire jobs API to Supabase`)                         |
+| Repository branch tip            | `main`; verify with `git rev-parse origin/main` after each push |
+| Deployment status                | Ready                                                           |
+| Health endpoint                  | `https://job-globe-com-web.vercel.app/api/health`               |
+| App                              | `apps/web`                                                      |
+| Framework                        | Next.js                                                         |
+| Expected install command         | `npm install`                                                   |
+| Expected build command           | `npm --workspace apps/web run build`                            |
+| Expected output                  | Next.js managed output                                          |
 
 Evidence in this workspace:
 
 - `README.md` records the live deployment URL.
 - `docs/qa/step-1-completion-report.md` records that the live Vercel URL returned HTTP 200 during final cross-check.
+- Production `/api/health` returned HTTP 200 on 2026-05-01 with `environment`, `supabase.jobs`, and `supabase.migrations` checks passing.
 
 ## Environment Files
 
@@ -63,6 +66,7 @@ Evidence in this workspace:
 - Docker Compose uses `.env` for local web and worker containers.
 - Staging and production secrets should be set in Vercel, Supabase, GitHub Actions, or the chosen managed secret store.
 - Vercel deployment verification is documented in `docs/runbooks/vercel-deployment.md`.
+- The previous `NEXT_PUBLIC_SUPABASE_URL` production environment blocker is resolved.
 
 ## Still Needed
 

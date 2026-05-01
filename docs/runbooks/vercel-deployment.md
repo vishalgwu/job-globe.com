@@ -2,16 +2,19 @@
 
 This runbook verifies the production deployment after changes land on `main`.
 
+Last verified: 2026-05-01. Production `/api/health` returned HTTP 200 with `environment`, `supabase.jobs`, and `supabase.migrations` checks passing.
+
 ## Production Target
 
-| Field | Value |
-| --- | --- |
-| Vercel project | `job-globe-com-web` |
-| Owner | `vishalgwu` |
-| Production URL | `https://job-globe-com-web.vercel.app/` |
-| Production branch | `main` |
-| App path | `apps/web` |
-| Build command | `npm --workspace apps/web run build` |
+| Field             | Value                                             |
+| ----------------- | ------------------------------------------------- |
+| Vercel project    | `job-globe-com-web`                               |
+| Owner             | `vishalgwu`                                       |
+| Production URL    | `https://job-globe-com-web.vercel.app/`           |
+| Health URL        | `https://job-globe-com-web.vercel.app/api/health` |
+| Production branch | `main`                                            |
+| App path          | `apps/web`                                        |
+| Build command     | `npm --workspace apps/web run build`              |
 
 ## Pre-Deploy Checks
 

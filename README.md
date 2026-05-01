@@ -10,7 +10,7 @@ npm.cmd install
 npm.cmd run dev
 ```
 
-`npm.cmd run dev` starts PostgreSQL 15 + pgvector, Redis 7, the placeholder web app, and the placeholder worker image through Docker Compose.
+`npm.cmd run dev` starts PostgreSQL 15 + pgvector, Redis 7, the Next.js web app, and the worker image through Docker Compose.
 
 For an explicit Docker smoke test:
 
@@ -33,7 +33,7 @@ docker compose -f infra/docker/docker-compose.dev.yml up -d --build web workers
 
 Shared logic belongs in `packages`; application folders do not import directly from each other.
 
-## Step 1 Verification
+## Verification
 
 ```powershell
 npm.cmd run verify:step1
@@ -43,6 +43,19 @@ npm.cmd run verify:step1
 ```
 
 Step 1 is complete. The repository baseline, local Docker baseline, Supabase staging database, Vercel deployment, GitHub branch protection, Product Owner approval, and Legal/Privacy approval are recorded in `docs/qa/step-1-completion-report.md`.
+
+The current project status is tracked in:
+
+- `docs/project-status/achieved-to-date.md`
+- `docs/project-status/remaining-work-phases.md`
+
+Current verified state:
+
+- Production `/api/health` returns HTTP 200.
+- `/api/jobs` reads from Supabase and returns `source: "supabase"`.
+- Docker local stack is working.
+- CI/CD is passing.
+- No known environment/configuration blocker remains.
 
 Live deployment:
 
