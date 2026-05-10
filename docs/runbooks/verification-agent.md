@@ -1,3 +1,0 @@
-# Verification Agent Runbook
-
-TODO

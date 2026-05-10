@@ -1,3 +1,0 @@
-# Ranking Agent Runbook
-
-TODO
