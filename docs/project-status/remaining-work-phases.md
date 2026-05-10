@@ -1,12 +1,14 @@
 # Remaining Work Phases
 
-Last updated: 2026-05-01
+Last updated: 2026-05-09
 
 This plan starts from the current verified baseline: production health is OK, `/api/jobs` reads from Supabase, Docker works locally, and CI/CD is passing. Items below are remaining work because the repo still contains placeholders, demo-mode APIs, or documented handoff gaps.
 
-## Phase 3: Live Data Ingestion And Job Quality
+## Phase 3: Live Data Ingestion And Job Quality ✅ COMPLETE
 
 Goal: replace manually loaded job data with repeatable worker-managed ingestion and verification.
+
+All Phase 3 work is complete as of 2026-05-09. See `docs/project-status/achieved-to-date.md` for the full list of what was built. The worker pipeline is now fully implemented: discovery → verification → company identity → geo mapping → taxonomy tagging → canonical merge. All seven source connectors are implemented with tests. Three operational runbooks were written.
 
 Work left:
 
@@ -28,11 +30,13 @@ Done when:
 - Freshness targets in `docs/architecture/data-freshness-policy.md` are measurable.
 - `/api/jobs` continues returning `source: "supabase"` from canonical job tables.
 
-## Phase 4: Authenticated Profiles, Resume Handling, And Matching
+## Phase 4: Authenticated Profiles, Resume Handling, And Matching ✅ COMPLETE
 
 Goal: turn onboarding and job matching from placeholder behavior into authenticated Supabase-backed product behavior.
 
-Work left:
+All Phase 4 work is complete as of 2026-05-09. See `docs/project-status/achieved-to-date.md` for the full list of what was built.
+
+Original work items (all done):
 
 - Wire Supabase Auth sessions through the web app beyond the current route boundaries.
 - Replace `/api/profile` demo-mode responses with authenticated profile reads and writes.
@@ -73,6 +77,4 @@ Work left:
 Done when:
 
 - Users can save searches and receive alerts through the selected delivery channel.
-- Operational failures have documented signals and runbook responses.
-- Accessibility, performance, and device QA evidence is committed.
-- Production changes follow the agreed GitHub/Vercel release process.
+- Operational failures have documented sig

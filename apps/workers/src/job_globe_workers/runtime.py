@@ -1,19 +1,10 @@
-from __future__ import annotations
+"""Runtime shim -- delegates to main.py.
 
-import time
+Kept for backwards compatibility with Dockerfile CMD and existing process
+supervisors that may reference this module by name.
+"""
 
-from job_globe_workers.settings import settings
-
-
-def run_placeholder_worker() -> None:
-    print(
-        "job-globe worker placeholder started "
-        f"redis_url={settings.redis_url} discovery_stream={settings.discovery_stream}",
-        flush=True,
-    )
-    while True:
-        time.sleep(60)
-
+from job_globe_workers.main import main
 
 if __name__ == "__main__":
-    run_placeholder_worker()
+    main()

@@ -79,7 +79,7 @@ export function GlobeExperience() {
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      hydrateSavedJobs();
+      void hydrateSavedJobs();
       setWebglAvailable(detectWebGL());
     }, 0);
 

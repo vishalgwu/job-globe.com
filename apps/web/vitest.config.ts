@@ -1,0 +1,19 @@
+import { defineConfig } from "vitest/config";
+import path from "path";
+
+export default defineConfig({
+  test: {
+    environment: "jsdom",
+    globals: true,
+    include: ["**/__tests__/**/*.test.ts", "**/__tests__/**/*.test.tsx"],
+  },
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./"),
+      "@job-globe/shared-types": path.resolve(
+        __dirname,
+        "../../packages/shared-types/typescript/index.ts",
+      ),
+    },
+  },
+});

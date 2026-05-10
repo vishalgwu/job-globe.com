@@ -4,7 +4,8 @@ import { create } from "zustand";
 
 import type { JobDetail, JobSummary } from "@job-globe/shared-types";
 
-const savedJobsStorageKey = "job-globe.demo.saved-job-ids";
+// Session storage is used as a fallback for unauthenticated users.
+const SESSION_STORAGE_KEY = "job-globe.demo.saved-job-ids";
 
 export interface JobStore {
   jobs: JobSummary[];
@@ -14,13 +15,17 @@ export interface JobStore {
   isLoading: boolean;
   error: string | null;
   savedJobIds: string[];
+  /** True once we've confirmed the user is authenticated. */
+  isAuthenticated: boolean;
   setJobs: (jobs: JobSummary[]) => void;
   setSelectedJob: (job: JobDetail | null) => void;
   setPanelOpen: (isPanelOpen: boolean) => void;
   setLoading: (isLoading: boolean) => void;
   setError: (error: string | null) => void;
-  hydrateSavedJobs: () => void;
-  toggleSavedJob: (jobId: string) => void;
+  /** Load saved job IDs — uses /api/saved-jobs if authenticated, sessionStorage otherwise. */
+  hydrateSavedJobs: () => Promise<void>;
+  /** Toggle a saved job — persists to API or sessionStorage based on auth state. */
+  toggleSavedJob: (jobId: string) => Promise<void>;
   isJobSaved: (jobId: string) => boolean;
 }
 
@@ -32,6 +37,8 @@ export const useJobStore = create<JobStore>((set, get) => ({
   isLoading: false,
   error: null,
   savedJobIds: [],
+  isAuthenticated: false,
+
   setJobs: (jobs) => set({ jobs }),
   setSelectedJob: (job) =>
     set({
@@ -42,39 +49,85 @@ export const useJobStore = create<JobStore>((set, get) => ({
   setPanelOpen: (isPanelOpen) => set({ isPanelOpen }),
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),
-  hydrateSavedJobs: () => set({ savedJobIds: readSavedJobIds() }),
-  toggleSavedJob: (jobId) => {
-    const savedJobIds = get().savedJobIds.includes(jobId)
-      ? get().savedJobIds.filter((savedJobId) => savedJobId !== jobId)
-      : [...get().savedJobIds, jobId];
-
-    writeSavedJobIds(savedJobIds);
-    set({ savedJobIds });
-  },
   isJobSaved: (jobId) => get().savedJobIds.includes(jobId),
+
+  hydrateSavedJobs: async () => {
+    try {
+      // Check auth state first
+      const sessionRes = await fetch("/api/auth/session");
+      const session = (await sessionRes.json()) as {
+        authenticated: boolean;
+        userId?: string;
+      };
+
+      if (session.authenticated) {
+        // Authenticated — fetch from the database
+        set({ isAuthenticated: true });
+        const res = await fetch("/api/saved-jobs");
+        if (res.ok) {
+          const data = (await res.json()) as { savedJobs: Array<{ job_id: string }> };
+          set({ savedJobIds: (data.savedJobs ?? []).map((j) => j.job_id) });
+        }
+      } else {
+        // Unauthenticated — read from session storage
+        set({ isAuthenticated: false, savedJobIds: readSessionSavedIds() });
+      }
+    } catch {
+      // Non-fatal — fall back to session storage
+      set({ savedJobIds: readSessionSavedIds() });
+    }
+  },
+
+  toggleSavedJob: async (jobId: string) => {
+    const { savedJobIds, isAuthenticated } = get();
+    const isSaved = savedJobIds.includes(jobId);
+
+    // Optimistic update
+    const next = isSaved
+      ? savedJobIds.filter((id) => id !== jobId)
+      : [...savedJobIds, jobId];
+    set({ savedJobIds: next });
+
+    if (isAuthenticated) {
+      try {
+        if (isSaved) {
+          await fetch(`/api/saved-jobs?jobId=${encodeURIComponent(jobId)}`, {
+            method: "DELETE",
+          });
+        } else {
+          await fetch("/api/saved-jobs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jobId }),
+          });
+        }
+      } catch {
+        // Roll back optimistic update on failure
+        set({ savedJobIds });
+      }
+    } else {
+      // Unauthenticated — persist to session storage
+      writeSessionSavedIds(next);
+    }
+  },
 }));
 
-function readSavedJobIds(): string[] {
-  if (typeof window === "undefined") {
-    return [];
-  }
+// ── Session storage helpers (unauthenticated fallback) ───────────────────
 
+function readSessionSavedIds(): string[] {
+  if (typeof window === "undefined") return [];
   try {
-    const rawValue = window.sessionStorage.getItem(savedJobsStorageKey);
-    const parsedValue: unknown = rawValue ? JSON.parse(rawValue) : [];
-
-    return Array.isArray(parsedValue)
-      ? parsedValue.filter((item): item is string => typeof item === "string")
+    const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === "string")
       : [];
   } catch {
     return [];
   }
 }
 
-function writeSavedJobIds(savedJobIds: string[]) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.sessionStorage.setItem(savedJobsStorageKey, JSON.stringify(savedJobIds));
+function writeSessionSavedIds(ids: string[]) {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(ids));
 }

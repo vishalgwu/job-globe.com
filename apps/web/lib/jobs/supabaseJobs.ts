@@ -447,3 +447,189 @@ function formatSalaryRange(salaryRange: JobDetail["salaryRange"]): string | null
 
   return `${salaryRange.currency} ${salaryRange.min.toLocaleString()}-${salaryRange.max.toLocaleString()}`;
 }
+
+// ── Profile-aware job detail (Phase 4) ────────────────────────────────────
+
+import type { OnboardingAnswers } from "@job-globe/shared-types";
+import {
+  buildMatchBreakdown,
+  type JobSnapshot,
+  type ProfileSnapshot,
+} from "../match/scorer";
+
+/**
+ * Fetch a single job detail and compute personalised match + quick-prep.
+ *
+ * If `profile` is null (unauthenticated), returns the same placeholder data
+ * that was present before Phase 4 so the UI degrades gracefully.
+ */
+export async function getJobDetailWithProfile(
+  jobId: string,
+  profile: OnboardingAnswers | null,
+): Promise<JobDetail | null> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("jobs_canonical")
+    .select(
+      `
+        id,
+        title,
+        description,
+        employment_type,
+        remote_type,
+        apply_url,
+        salary_min,
+        salary_max,
+        currency,
+        required_skills,
+        status,
+        first_seen_at,
+        companies!inner(id, name, logo_url),
+        locations!inner(id, country_code, country_name, region, city, latitude, longitude),
+        job_taxonomy_links(job_taxonomy(category, value))
+      `,
+    )
+    .eq("id", jobId)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Supabase job detail query failed: ${error.message}`);
+  }
+
+  if (!data) return null;
+
+  const row = data as unknown as JobRow;
+  const base = toJobDetail(row);
+  if (!base) return null;
+
+  if (!profile) {
+    // Unauthenticated — return placeholder (same as before Phase 4)
+    return base;
+  }
+
+  // ── Real match breakdown ────────────────────────────────────────────────
+  const taxFunctions = (row.job_taxonomy_links ?? [])
+    .map((l) => l.job_taxonomy)
+    .filter((t) => t?.category === "function")
+    .map((t) => t!.value);
+
+  const profileSnap: ProfileSnapshot = {
+    desiredRoleFamily: profile.desiredRoleFamily,
+    targetLocations: profile.targetLocations,
+    remotePreference: profile.remotePreference,
+    jobTypes: profile.jobTypes,
+    salarySensitivity: profile.salarySensitivity,
+  };
+
+  const jobSnap: JobSnapshot = {
+    title: row.title,
+    remote_type: toRemoteMode(row.remote_type),
+    employment_type: toJobType(row.employment_type),
+    seniority: null, // populated from taxonomy if available
+    location_city: row.locations?.city ?? null,
+    location_country: row.locations?.country_name ?? null,
+    taxonomy_functions: taxFunctions,
+  };
+
+  const matchBreakdown = buildMatchBreakdown(profileSnap, jobSnap);
+
+  // ── Profile-aware quick prep ────────────────────────────────────────────
+  const jobSkills = (row.required_skills ?? []).map((s: string) => s.toLowerCase());
+  const profileRole = profile.desiredRoleFamily.toLowerCase().replace(/-/g, " ");
+
+  // Skills the user's role family implies they likely have
+  const roleImpliedSkills = inferRoleSkills(profile.desiredRoleFamily);
+  const skillsIHave = jobSkills.filter((s) =>
+    roleImpliedSkills.some((r) => s.includes(r) || r.includes(s)),
+  );
+  const skillsMissing = jobSkills.filter((s) => !skillsIHave.includes(s)).slice(0, 5);
+
+  const companyName = row.companies?.name ?? "this company";
+  const roleLabel = profile.desiredRoleFamily
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+
+  const quickPrep = {
+    roleSummary: summarize(row.description),
+    skillsIHave: skillsIHave.slice(0, 5),
+    skillsMissing,
+    interviewQuestions: buildInterviewQuestions(row.title, companyName, jobSkills, profileRole),
+    companyBrief: `${companyName} is hiring a ${row.title}. ${
+      taxFunctions.length > 0 ? `This role falls under ${taxFunctions[0]}.` : ""
+    }`.trim(),
+    resumeTailoringNote: buildResumeTip(skillsIHave, skillsMissing, roleLabel),
+  };
+
+  return { ...base, matchBreakdown, quickPrep };
+}
+
+// ── Quick-prep helpers ────────────────────────────────────────────────────
+
+/** Map role families to a broad set of expected skills for overlap scoring. */
+function inferRoleSkills(roleFamily: string): string[] {
+  const map: Record<string, string[]> = {
+    "software-engineering": [
+      "python", "javascript", "typescript", "java", "go", "rust",
+      "react", "node", "docker", "kubernetes", "git", "sql",
+      "rest api", "microservices", "ci/cd",
+    ],
+    "machine-learning": [
+      "python", "tensorflow", "pytorch", "scikit-learn", "pandas", "numpy",
+      "sql", "spark", "kafka", "airflow", "aws", "gcp",
+    ],
+    "data-analytics": [
+      "sql", "python", "r", "pandas", "spark", "dbt", "snowflake",
+      "bigquery", "tableau", "data warehousing",
+    ],
+    "product-management": [
+      "jira", "agile", "scrum", "sql", "figma",
+    ],
+    "design": [
+      "figma", "sketch", "adobe xd", "agile",
+    ],
+    "security": [
+      "python", "bash", "linux", "aws", "azure", "docker",
+    ],
+    "operations": [
+      "python", "bash", "docker", "kubernetes", "terraform", "ansible",
+      "aws", "azure", "ci/cd", "linux",
+    ],
+  };
+
+  return map[roleFamily] ?? [];
+}
+
+function buildInterviewQuestions(
+  title: string,
+  company: string,
+  skills: string[],
+  roleFamily: string,
+): string[] {
+  const topSkill = skills[0] ?? "the required skills";
+  const secondSkill = skills[1];
+
+  return [
+    `Can you walk us through a project where you used ${topSkill} in a production environment?`,
+    secondSkill
+      ? `How have you combined ${topSkill} and ${secondSkill} to solve a real problem?`
+      : `What excites you most about the ${title} role at ${company}?`,
+    `What part of this ${title} role would you want to ramp on first, and why?`,
+    `How do you stay current in ${roleFamily.replace(/-/g, " ")}?`,
+    `Why ${company} — what specifically drew you to this opportunity?`,
+  ];
+}
+
+function buildResumeTip(
+  have: string[],
+  missing: string[],
+  roleLabel: string,
+): string {
+  if (missing.length === 0) {
+    return `Your ${roleLabel} background maps well to this role. Lead with concrete outcomes and metrics.`;
+  }
+
+  const gapList = missing.slice(0, 3).join(", ");
+  return `Highlight experience that demonstrates transferable skills for: ${gapList}. Quantify your impact wherever possible.`;
+}

@@ -295,7 +295,11 @@ export function OnboardingFlow() {
       }
 
       setProfile(payload.profile);
-      setSubmitMessage("Profile saved in demo mode.");
+      setSubmitMessage(
+        payload.mode === "authenticated"
+          ? "Profile saved to your account."
+          : "Profile saved in demo mode. Sign in to keep it across sessions.",
+      );
     } finally {
       setSavingProfile(false);
     }

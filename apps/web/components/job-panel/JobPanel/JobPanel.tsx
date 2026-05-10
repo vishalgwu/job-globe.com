@@ -10,7 +10,7 @@ interface JobPanelProps {
   isSaved: boolean;
   isLoading: boolean;
   onClose: () => void;
-  onSave: (jobId: string) => void;
+  onSave: (jobId: string) => void | Promise<void>;
 }
 
 export function JobPanel({ job, isOpen, isSaved, isLoading, onClose, onSave }: JobPanelProps) {

@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["dom", "dom.iterable", "es2022"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "es2022"
+    ],
     "allowJs": false,
     "skipLibCheck": true,
     "strict": true,
@@ -15,9 +19,15 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"],
-      "@job-globe/shared-types": ["../../packages/shared-types/typescript/index.ts"],
-      "@job-globe/shared-types/*": ["../../packages/shared-types/typescript/*"]
+      "@/*": [
+        "./*"
+      ],
+      "@job-globe/shared-types": [
+        "../../packages/shared-types/typescript/index.ts"
+      ],
+      "@job-globe/shared-types/*": [
+        "../../packages/shared-types/typescript/*"
+      ]
     },
     "plugins": [
       {
@@ -34,5 +44,10 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules", ".next"]
+  "exclude": [
+    "node_modules",
+    ".next",
+    "__tests__",
+    "vitest.config.ts"
+  ]
 }
