@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import threading
 import time
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -65,10 +65,10 @@ def _is_due(last_run: datetime | None, rule: SourceFreshnessRule) -> bool:
     """Return True when the connector has not run recently enough."""
     if last_run is None:
         return True
-    now = datetime.now(tz=UTC)
+    now = datetime.now(tz=timezone.utc)  # noqa: UP017
     # Ensure last_run is timezone-aware for comparison
     if last_run.tzinfo is None:
-        last_run = last_run.replace(tzinfo=UTC)
+        last_run = last_run.replace(tzinfo=timezone.utc)  # noqa: UP017
     return (now - last_run) >= rule.interval
 
 

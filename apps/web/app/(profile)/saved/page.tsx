@@ -77,7 +77,7 @@ export default function SavedPage() {
         <section className="auth-shell">
           <h1>Saved Jobs</h1>
           <p>
-            <Link href="/login">Sign in</Link> to see jobs you've saved across
+            <Link href="/login">Sign in</Link> to see jobs you&apos;ve saved across
             sessions.
           </p>
         </section>

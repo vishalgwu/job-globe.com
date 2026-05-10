@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import threading
 import time
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -45,14 +45,14 @@ _SOURCES = [
 
 # ── Redis stream metrics ───────────────────────────────────────────────────
 
-def queue_depths() -> dict[str, int]:
+def queue_depths() -> dict[str, Any]:
     """Return the current length of each Redis stream (pending message count)."""
     client = Redis.from_url(settings.redis_url, decode_responses=True)  # type: ignore[call-arg]
     depths: dict[str, int] = {}
     for stream in _STREAMS:
         try:
             info = client.xlen(stream)  # type: ignore[attr-defined]
-            depths[stream] = int(info)
+            depths[stream] = int(info)  # type: ignore[arg-type]
         except Exception:  # noqa: BLE001
             depths[stream] = -1
     return depths
@@ -60,7 +60,7 @@ def queue_depths() -> dict[str, int]:
 
 # ── DB metrics ────────────────────────────────────────────────────────────
 
-def source_freshness() -> dict[str, dict[str, Any]]:
+def source_freshness() -> dict[str, Any]:
     """Return last-run info for each source connector."""
     pool = get_pool()
     result: dict[str, dict[str, Any]] = {}
@@ -85,11 +85,11 @@ def source_freshness() -> dict[str, dict[str, Any]]:
             age_seconds: float | None = None
             if started_at:
                 aware_started = (
-                    started_at.replace(tzinfo=UTC)
+                    started_at.replace(tzinfo=timezone.utc)  # noqa: UP017
                     if started_at.tzinfo is None
                     else started_at
                 )
-                age_seconds = (datetime.now(tz=UTC) - aware_started).total_seconds()
+                age_seconds = (datetime.now(tz=timezone.utc) - aware_started).total_seconds()  # noqa: UP017
 
             result[source] = {
                 "status": status,
@@ -165,7 +165,7 @@ def report() -> dict[str, Any]:
 
     return {
         "status": overall,
-        "timestamp": datetime.now(tz=UTC).isoformat(),
+        "timestamp": datetime.now(tz=timezone.utc).isoformat(),  # noqa: UP017
         "queue_depths": depths,
         "source_freshness": freshness,
         "ingestion_summary": summary,
