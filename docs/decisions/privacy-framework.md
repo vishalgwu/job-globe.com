@@ -1,6 +1,7 @@
 # Privacy Framework
 
 ## Status
+
 Drafted for Legal/Privacy Advisor sign-off
 
 ## Data Collected
@@ -49,4 +50,4 @@ Raw resume files must never be public. Access requires a signed URL scoped to th
 
 ## Sign-off
 
-LGL sign-off is required before Step 2 handoff can be considered complete in a real staging environment.
+Legal/privacy sign-off is required before full production launch.

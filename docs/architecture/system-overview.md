@@ -1,82 +1,86 @@
 # System Overview
 
-Jarvis Job Globe is a full-stack job discovery platform. The architecture separates a Next.js web app from a Python worker pipeline, connected through a PostgreSQL database and a Redis Streams event bus.
+Jarvis Job Globe is a full-stack job discovery platform. It separates a Next.js web app from a Python worker pipeline, connected through Supabase/PostgreSQL and Redis Streams.
+
+For maintained handoff docs, see:
+
+- `docs/md/PROJECT_STATUS.md`
+- `docs/md/FRONTEND.md`
+- `docs/md/API.md`
+- `docs/md/WORKERS.md`
+- `docs/md/DATABASE.md`
+- `docs/md/INFRASTRUCTURE.md`
 
 ## Components
 
-### Web app (`apps/web`)
+### Web App
 
-Next.js 14 App Router deployed to Vercel. Handles:
+Location: `apps/web`
 
-- Globe rendering (globe.gl / Three.js / Deck.gl)
-- Supabase Auth — cookie-based SSR sessions via `@supabase/ssr`
-- Onboarding (profile questionnaire + resume upload)
-- Authenticated profile, saved jobs, and alerts pages
-- Job detail with live rule-based match scoring for signed-in users
-- All `/api/*` routes reading from Supabase via the service-role key
+The web app handles:
 
-### Worker plane (`apps/workers`)
+- globe browsing and fallback list/map behavior
+- search and filters
+- job list and job detail panel
+- Supabase auth pages and session-aware APIs
+- onboarding, profile, resume, saved jobs, alerts, and application history
+- route handlers under `apps/web/app/api`
 
-Python 3.11 multi-threaded process running as a Docker container. Runs the full ingestion pipeline:
+### Worker Plane
 
-1. **Discovery runner** — fetches from 7 source connectors, publishes `RawJobEvent` to Redis Stream `job-globe.discovery`
-2. **Verification worker** — HTTP HEAD-checks apply URLs, computes trust scores, filters dead links
-3. **Company identity resolver** — domain extraction, Clearbit logo fetch, trust score, upserts `companies`
-4. **Geo mapper** — matches city to ~200 hardcoded centroids or pycountry country fallback, upserts `locations`
-5. **Taxonomy tagger** — rule-based classification of function/seniority/remote_type/employment_type with confidence
-6. **Duplicate detector** — fingerprint dedup, idempotent upsert into `jobs_canonical`
+Location: `apps/workers/src/job_globe_workers`
 
-The observability health module logs queue depth, source freshness, and 24-hour ingestion volume every 5 minutes.
+The worker package handles:
 
-### Shared packages
+1. discovery from configured job sources
+2. Redis Streams publication/consumption
+3. URL verification
+4. company identity enrichment
+5. geo mapping
+6. taxonomy tagging
+7. duplicate detection and canonical job upserts
+8. worker health logging
 
-- `packages/database` — 13 SQL migrations, seed data, migration validation scripts
-- `packages/shared-types` — TypeScript and Python (Pydantic) contracts for jobs, companies, locations, profiles, and match results
-- `packages/config` — environment variable templates
+### Database
 
-### Infrastructure (`infra`)
+Location: `packages/database`
 
-- `infra/docker/` — Docker Compose for local dev (PostgreSQL 15 + pgvector, Redis 7, web, workers)
-- `infra/scripts/` — deploy, migration, and seed scripts
-- `infra/terraform/` — cloud infrastructure placeholders (not yet active)
+The schema is PostgreSQL with pgvector support. Migrations define users, profiles, resumes, companies, locations, raw/canonical jobs, taxonomy, embeddings, saved jobs, applications, alerts, agent runs, and audit events.
 
-## Data flow
+### Shared Packages
 
-```
-Source APIs
-    │  fetch on freshness schedule
-    ▼
-Discovery Runner → Redis Stream (job-globe.discovery)
-    │  consume
-    ▼
-Verification → Company Identity → Geo Mapping → Taxonomy → Duplicate Detection
-    │  upsert
-    ▼
-jobs_canonical (PostgreSQL / Supabase)
-    │  read
-    ▼
-/api/jobs → Globe UI
-```
+Location: `packages/shared-types`, `packages/config`
 
-The web app reads only. Workers write only. No shared application code crosses the boundary.
+TypeScript contracts are used by the web app. Python contract files exist for future alignment. Config templates document environment variables by target environment.
 
-## Auth flow
+### Infrastructure
 
-```
-Browser → Supabase Auth (email/password) → HttpOnly session cookie
-API routes → resolveRequestUser() → Supabase JWT verification → internal users table
+Location: `infra`, `.github`
+
+Docker Compose supports local development. GitHub Actions runs web, worker, and database checks. Vercel deploys the web app from `main`. Terraform files currently contain placeholders only.
+
+## Data Flow
+
+```text
+External job APIs
+  -> discovery runner
+  -> Redis Stream
+  -> verification
+  -> company identity / geo / taxonomy
+  -> duplicate detection
+  -> jobs_canonical in PostgreSQL
+  -> /api/jobs
+  -> globe UI
 ```
 
-Anonymous users can browse and save jobs to session storage. Authenticated users get profile persistence, resume storage, real match scores, and (Phase 5) alerts.
+## Auth Flow
 
-## Key design decisions
+```text
+Browser
+  -> Supabase Auth
+  -> HttpOnly session cookie
+  -> API route resolveRequestUser()
+  -> internal users table
+```
 
-| Decision | ADR |
-|---|---|
-| Monorepo structure | ADR-001 |
-| PostgreSQL + Supabase | ADR-002 |
-| globe.gl for 3-D rendering | ADR-003 |
-| Embedding model (deferred) | ADR-004 |
-| Supabase Auth | ADR-005 |
-
-See `docs/decisions/` for full ADRs.
+Anonymous users can browse jobs. Authenticated users can persist profiles, resumes, saved jobs, alerts, applications, and receive personalized match details.
