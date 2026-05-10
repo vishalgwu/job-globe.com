@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import threading
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
@@ -64,8 +64,6 @@ def source_freshness() -> dict[str, dict[str, Any]]:
     """Return last-run info for each source connector."""
     pool = get_pool()
     result: dict[str, dict[str, Any]] = {}
-    cutoff = datetime.now(tz=timezone.utc) - timedelta(hours=24)
-
     with pool.connection() as conn:
         for source in _SOURCES:
             row = conn.execute(
@@ -87,11 +85,11 @@ def source_freshness() -> dict[str, dict[str, Any]]:
             age_seconds: float | None = None
             if started_at:
                 aware_started = (
-                    started_at.replace(tzinfo=timezone.utc)
+                    started_at.replace(tzinfo=UTC)
                     if started_at.tzinfo is None
                     else started_at
                 )
-                age_seconds = (datetime.now(tz=timezone.utc) - aware_started).total_seconds()
+                age_seconds = (datetime.now(tz=UTC) - aware_started).total_seconds()
 
             result[source] = {
                 "status": status,
@@ -167,7 +165,7 @@ def report() -> dict[str, Any]:
 
     return {
         "status": overall,
-        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+        "timestamp": datetime.now(tz=UTC).isoformat(),
         "queue_depths": depths,
         "source_freshness": freshness,
         "ingestion_summary": summary,

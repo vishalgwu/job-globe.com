@@ -119,7 +119,9 @@ def _deserialise(payload: dict[str, str]) -> dict[str, Any]:
     return result
 
 
-def process_canonical_event(event: dict[str, Any], taxonomy_index: dict[str, dict[str, uuid.UUID]]) -> bool:
+def process_canonical_event(
+    event: dict[str, Any], taxonomy_index: dict[str, dict[str, uuid.UUID]]
+) -> bool:
     """Process one enriched event from the canonical stream.
 
     Upserts jobs_canonical and writes taxonomy links.
@@ -138,7 +140,7 @@ def process_canonical_event(event: dict[str, Any], taxonomy_index: dict[str, dic
 
     title = event.get("title", "")
     description = event.get("description", "")
-    company_name = event.get("company_name") or "Unknown"
+    _company_name = event.get("company_name") or "Unknown"
     location_raw = event.get("location_raw") or ""
 
     # Try to parse numeric IDs

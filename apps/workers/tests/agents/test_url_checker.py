@@ -7,10 +7,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from job_globe_workers.agents.verification.url_checker import (
-    UrlCheckResult,
     _compute_trust_score,
     check_url,
 )

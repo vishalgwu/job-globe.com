@@ -61,7 +61,7 @@ def _extract_domain(apply_url: str) -> str | None:
         return None
     try:
         parsed = urlparse(apply_url)
-        host = parsed.netloc.lower().lstrip("www.")
+        host = parsed.netloc.lower().removeprefix("www.")
         # Strip port if present
         host = host.split(":")[0]
         return host if "." in host else None

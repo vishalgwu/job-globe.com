@@ -6,7 +6,6 @@ import pytest
 
 from job_globe_workers.agents.geo_mapping.geocoder import geocode
 
-
 # ── geocode() ──────────────────────────────────────────────────────────────
 
 class TestGeocode:

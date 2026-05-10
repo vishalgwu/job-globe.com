@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
@@ -30,7 +30,10 @@ from job_globe_workers.agents.discovery.connectors.lever import LeverConnector
 from job_globe_workers.agents.discovery.connectors.smartrecruiters import SmartRecruitersConnector
 from job_globe_workers.agents.discovery.connectors.usajobs import UsaJobsConnector
 from job_globe_workers.agents.discovery.connectors.workable import WorkableConnector
-from job_globe_workers.agents.discovery.scheduler import DEFAULT_FRESHNESS_RULES, SourceFreshnessRule
+from job_globe_workers.agents.discovery.scheduler import (
+    DEFAULT_FRESHNESS_RULES,
+    SourceFreshnessRule,
+)
 from job_globe_workers.db.connection import get_pool
 from job_globe_workers.db.repositories.agent_runs import (
     finish_agent_run,
@@ -62,10 +65,10 @@ def _is_due(last_run: datetime | None, rule: SourceFreshnessRule) -> bool:
     """Return True when the connector has not run recently enough."""
     if last_run is None:
         return True
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     # Ensure last_run is timezone-aware for comparison
     if last_run.tzinfo is None:
-        last_run = last_run.replace(tzinfo=timezone.utc)
+        last_run = last_run.replace(tzinfo=UTC)
     return (now - last_run) >= rule.interval
 
 

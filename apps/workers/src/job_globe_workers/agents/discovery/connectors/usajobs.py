@@ -24,7 +24,9 @@ Response shape (abbreviated):
               "PublicationStartDate": "2026-04-01",
               "ApplicationCloseDate": "2026-06-01",
               "UserArea": {"Details": {"JobSummary": "We are looking for…"}},
-              "PositionRemuneration": [{"MinimumRange": "80000", "MaximumRange": "120000", "CurrencyCode": "USD"}],
+              "PositionRemuneration": [
+                {"MinimumRange": "80000", "MaximumRange": "120000", "CurrencyCode": "USD"}
+              ],
               "ApplyURI": ["https://www.usajobs.gov/job/…"],
               "PositionURI": "https://www.usajobs.gov/job/…"
             }

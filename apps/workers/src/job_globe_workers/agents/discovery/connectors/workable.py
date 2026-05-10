@@ -90,7 +90,10 @@ class WorkableConnector(AbstractConnector):
             or location.get("city", "")
         )
         description_obj = job.get("description") or {}
-        description = description_obj.get("body", "") if isinstance(description_obj, dict) else str(description_obj)
+        if isinstance(description_obj, dict):
+            description = description_obj.get("body", "")
+        else:
+            description = str(description_obj)
 
         shortcode = job.get("shortcode", "")
         apply_url = (
@@ -109,7 +112,9 @@ class WorkableConnector(AbstractConnector):
             "company_name": company_slug,
             "location_raw": str(location_raw),
             "description": str(description)[:5000],
-            "employment_type": emp_type if emp_type in ("full-time", "part-time", "contract") else "full-time",
+            "employment_type": (
+                emp_type if emp_type in ("full-time", "part-time", "contract") else "full-time"
+            ),
             "required_skills": [],
             "metadata": {
                 "company_slug": company_slug,

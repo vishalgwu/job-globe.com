@@ -6,16 +6,16 @@ using fixture data, without making real HTTP requests.
 
 from __future__ import annotations
 
-import pytest
-
 from job_globe_workers.agents.discovery.connectors.adzuna import AdzunaConnector
 from job_globe_workers.agents.discovery.connectors.eures import EuresConnector
-from job_globe_workers.agents.discovery.connectors.greenhouse import GreenhouseConnector, _strip_html
+from job_globe_workers.agents.discovery.connectors.greenhouse import (
+    GreenhouseConnector,
+    _strip_html,
+)
 from job_globe_workers.agents.discovery.connectors.lever import LeverConnector
 from job_globe_workers.agents.discovery.connectors.smartrecruiters import SmartRecruitersConnector
 from job_globe_workers.agents.discovery.connectors.usajobs import UsaJobsConnector
 from job_globe_workers.agents.discovery.connectors.workable import WorkableConnector
-
 
 # ── Greenhouse ─────────────────────────────────────────────────────────────
 

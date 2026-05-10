@@ -13,7 +13,9 @@ from job_globe_workers.agents.company_identity.resolver import (
 
 class TestExtractDomain:
     def test_greenhouse_url(self) -> None:
-        assert _extract_domain("https://boards.greenhouse.io/acme/jobs/123") == "boards.greenhouse.io"
+        assert (
+            _extract_domain("https://boards.greenhouse.io/acme/jobs/123") == "boards.greenhouse.io"
+        )
 
     def test_strips_www(self) -> None:
         assert _extract_domain("https://www.lever.co/company/jobs") == "lever.co"

@@ -10,7 +10,9 @@ from job_globe_workers.agents.discovery.scheduler import DEFAULT_FRESHNESS_RULES
 class TestFreshnessRules:
     def test_all_expected_sources_present(self) -> None:
         sources = {rule.source for rule in DEFAULT_FRESHNESS_RULES}
-        expected = {"greenhouse", "lever", "smartrecruiters", "workable", "usajobs", "eures", "adzuna"}
+        expected = {
+            "greenhouse", "lever", "smartrecruiters", "workable", "usajobs", "eures", "adzuna"
+        }
         assert sources == expected
 
     def test_greenhouse_lever_support_webhooks(self) -> None:

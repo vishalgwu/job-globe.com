@@ -16,7 +16,9 @@ class TestClassify:
         assert "software-engineering" in functions
 
     def test_machine_learning_function(self) -> None:
-        matches = classify("Machine Learning Engineer", "Deep learning and PyTorch experience required.")
+        matches = classify(
+            "Machine Learning Engineer", "Deep learning and PyTorch experience required."
+        )
         functions = {m.value for m in matches if m.category == "function"}
         assert "machine-learning" in functions
 
@@ -46,7 +48,9 @@ class TestClassify:
         assert "entry" in seniority
 
     def test_remote_detection(self) -> None:
-        matches = classify("Software Engineer", "This is a fully remote role. Work from home anywhere.")
+        matches = classify(
+            "Software Engineer", "This is a fully remote role. Work from home anywhere."
+        )
         remote = {m.value for m in matches if m.category == "remote_type"}
         assert "remote" in remote
 

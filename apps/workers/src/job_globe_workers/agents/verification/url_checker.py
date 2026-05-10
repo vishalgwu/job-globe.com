@@ -130,7 +130,7 @@ def check_url(apply_url: str) -> UrlCheckResult:
 
     final_url = str(resp.url)
     parsed = urlparse(final_url)
-    final_domain = parsed.netloc.lower().lstrip("www.")
+    final_domain = parsed.netloc.lower().removeprefix("www.")
     is_https = parsed.scheme == "https"
     redirect_count = len(resp.history)
     status_code = resp.status_code
