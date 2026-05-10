@@ -1,11 +1,8 @@
 /**
  * /api/profile
  *
- * GET  — return the authenticated user's profile, or demo stub if unauthenticated.
- * POST — upsert profile from onboarding answers. Authenticated users write to
- *        the profiles table; unauthenticated users get the same validation +
- *        a demo-mode response (backwards-compatible with the onboarding flow
- *        being accessible without a login wall).
+ * GET  - return the authenticated user's profile.
+ * POST - upsert profile from onboarding answers.
  */
 
 import { type NextRequest, NextResponse } from "next/server";
@@ -57,12 +54,7 @@ export async function GET(request: NextRequest) {
   const user = await resolveRequestUser(request);
 
   if (!user) {
-    return NextResponse.json({
-      mode: "demo",
-      profile: null,
-      source: "unauthenticated",
-      message: "Sign in to save and retrieve your profile.",
-    });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
@@ -100,6 +92,16 @@ export async function GET(request: NextRequest) {
 // ── POST ───────────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+  const user = await resolveRequestUser(request);
+  if (!user) {
+    const response: ProfileSaveResponse = {
+      ok: false,
+      mode: "authenticated",
+      errors: [{ field: "payload", message: "Sign in to save your profile." }],
+    };
+    return NextResponse.json({ ...response, error: "Unauthorized" }, { status: 401 });
+  }
+
   let payload: unknown;
   try {
     payload = await request.json();
@@ -121,20 +123,6 @@ export async function POST(request: NextRequest) {
   }
 
   const answers = normalizeAnswers(answersPayload as Record<string, unknown>);
-  const user = await resolveRequestUser(request);
-
-  // ── Demo mode (unauthenticated) ──────────────────────────────────────────
-  if (!user) {
-    const profile: ProfileSummary = {
-      id: "demo-profile-local",
-      userId: null,
-      mode: "demo",
-      answers,
-      savedAt: new Date().toISOString(),
-    };
-    const response: ProfileSaveResponse = { ok: true, mode: "demo", profile };
-    return NextResponse.json(response, { status: 202 });
-  }
 
   // ── Authenticated mode ───────────────────────────────────────────────────
   try {

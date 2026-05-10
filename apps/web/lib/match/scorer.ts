@@ -55,6 +55,15 @@ const REMOTE_COMPAT: Record<string, string[]> = {
   flexible: ["remote", "hybrid", "on-site"],
 };
 
+function normaliseRoleText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[-_/]+/g, " ")
+    .replace(/[^\w\s]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function ruleBasedScore(
   profile: ProfileSnapshot,
   job: JobSnapshot,
@@ -102,9 +111,9 @@ export function ruleBasedScore(
   }
 
   // ── Role family / taxonomy (weight 0.30) ─────────────────────────────────
-  const roleFamilyNorm = profile.desiredRoleFamily.toLowerCase().replace(/-/g, " ");
-  const titleNorm = job.title.toLowerCase();
-  const taxFns = (job.taxonomy_functions ?? []).map((f) => f.toLowerCase());
+  const roleFamilyNorm = normaliseRoleText(profile.desiredRoleFamily);
+  const titleNorm = normaliseRoleText(job.title);
+  const taxFns = (job.taxonomy_functions ?? []).map(normaliseRoleText);
 
   const roleHit =
     titleNorm.includes(roleFamilyNorm) ||

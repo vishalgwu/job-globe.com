@@ -17,8 +17,10 @@ from __future__ import annotations
 
 import re
 import uuid
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any, Protocol
 
 import pycountry
 import structlog
@@ -180,6 +182,11 @@ _COUNTRY_CENTROIDS: dict[str, tuple[float, float, str]] = {
 }
 
 
+class ConnectionPoolLike(Protocol):
+    def connection(self) -> AbstractContextManager[Any]:
+        ...
+
+
 @dataclass
 class GeoResult:
     country_code: str
@@ -304,18 +311,23 @@ def _title_case(text: str) -> str:
     return " ".join(w.capitalize() for w in text.split())
 
 
-def resolve_location(location_raw: str, pool: object) -> uuid.UUID | None:
+def resolve_location(
+    location_raw: str, pool: ConnectionPoolLike | None = None
+) -> uuid.UUID | None:
     """Geocode a location string and upsert into the locations table.
 
     Returns the location UUID, or None if geocoding fails.
     """
-    from job_globe_workers.db.connection import get_pool as _get_pool
     from job_globe_workers.db.repositories.locations import (
         find_location_by_city,
         upsert_location,
     )
 
-    pool = _get_pool()
+    if pool is None:
+        from job_globe_workers.db.connection import get_pool as _get_pool
+
+        pool = _get_pool()
+
     result = geocode(location_raw)
     if result is None:
         return None
