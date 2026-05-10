@@ -17,6 +17,7 @@ EXPECTED_FILES = [
     "010_agent_runs.sql",
     "011_audit_events.sql",
     "012_job_time_filter_indexes.sql",
+    "013_profiles_preferences.sql",
 ]
 EXPECTED_TABLES = {
     "users", "auth_sessions", "profiles", "resume_extractions", "companies", "locations",
@@ -31,7 +32,7 @@ def main(migrations_dir: str) -> int:
     if files != EXPECTED_FILES:
         print(f"Migration file order mismatch: {files}")
         return 1
-    sql = "\n".join((root / name).read_text(encoding="utf-8") for name in EXPECTED_FILES)
+    sql = "\n".join((root / name).read_text(encoding="utf-8") for name in EXPECTED_FILES)  # noqa: E501
     tables = set(re.findall(r"CREATE TABLE IF NOT EXISTS\s+([a-z_]+)", sql, flags=re.I))
     missing = EXPECTED_TABLES - tables
     extra = tables - EXPECTED_TABLES
@@ -48,7 +49,7 @@ def main(migrations_dir: str) -> int:
     if "idx_jobs_canonical_status_first_seen_at" not in sql:
         print("Expected jobs_canonical time-filter index is missing")
         return 1
-    print("Migration validation passed: 12 files, 17 tables, pgvector, and GIN indexes present.")
+    print("Migration validation passed: 13 files, 17 tables, pgvector, and GIN indexes present.")
     return 0
 
 

@@ -70,4 +70,4 @@ jobs:
             where table_schema = 'public'
               and table_name <> 'schema_migrations';
           " | grep 17
-      - run: psql "$DATABASE_URL" -tAc "select count(*) from schema_migrations;" | grep 12
+      - run: psql "$DATABASE_URL" -tAc "select count(*) from schema_migrations;" | grep 13
