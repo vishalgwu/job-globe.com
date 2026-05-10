@@ -1,6 +1,6 @@
 # Achieved To Date
 
-Last updated: 2026-05-09
+Last updated: 2026-05-10
 
 This file records only work that is visible in the repository, verified through local commands, or verified through the live production endpoints. It does not include secrets.
 
@@ -102,11 +102,29 @@ This file records only work that is visible in the repository, verified through 
 - **Onboarding success message** — `OnboardingFlow` now shows "Profile saved to your account." vs "Profile saved in demo mode." based on the `mode` field returned by `/api/profile POST`.
 - **Vitest test suite** (`__tests__/`) — 3 test files covering match scorer pure functions (`cosineSimilarity`, `ruleBasedScore`, `buildMatchBreakdown`, `buildSummary`), profile validation logic (all field rules, consent normalisation), and auth-guard contracts (session shape, 401 guard pattern). Vitest added to `package.json` and CI.
 
-## Explicitly Not Complete Yet
+## Phase 5: Alerts, Applications, Observability, And Launch QA (Completed 2026-05-10)
 
-- `/api/alerts` is still a placeholder.
-- Application tracking and redirect history are not implemented.
-- Production observability, health-check smoke tests, Lighthouse scores, and browser/device QA are not recorded.
-- VoiceOver and NVDA accessibility QA evidence is not committed.
-- Resume NLP parsing (structured field extraction with confidence values) is deferred — the storage and retention pipeline is complete; the parser is a Phase 5 enrichment step.
-- Embedding-based match scoring (`profile_embeddings` / `job_embeddings` tables) is deferred per ADR-004 until the model decision is validated in production.
+- **`/api/alerts`** (`app/api/alerts/route.ts`) — full implementation: GET (list), POST (create with validation + daily-max guard), DELETE (scoped to user), PATCH (pause/resume). Backed by the `alerts` Supabase table (migration 009).
+- **Alerts page** (`app/(profile)/alerts/page.tsx`) — functional UI: create alert with custom name, list with filter summary and channel/score badges, pause/resume, delete. Auth-gated with redirect to login.
+- **`/api/applications`** (`app/api/applications/route.ts`) — GET (paginated history, limit param), POST (upsert redirect record with URL validation). Backed by `applications` table (migration 008).
+- **Applications page** (`app/(profile)/applications/page.tsx`) — lists apply redirect history with domain label, date, status, and re-open link. Auth-gated.
+- **`/api/health` expanded** — added `supabase.auth` and `supabase.storage` checks alongside existing environment/jobs/migrations checks. Added `durationMs` to response.
+- **Structured logger** (`lib/observability/logger.ts`) — `log.info/warn/error(route, fields)` emitting JSON lines to stdout; `withObservability()` wrapper for automatic duration and error logging.
+- **In-process metrics** (`lib/observability/metrics.ts`) — named counters for all key API operations; reset on cold start; intended for local/staging visibility.
+- **Smoke test suite** (`__tests__/smoke-api.test.ts`) — 18 Vitest tests covering `/api/health` contract, `/api/auth/session` shape, 401 auth guards for alerts/applications/profile/saved-jobs, and input validation for alerts and applications.
+- **Lighthouse baseline doc** (`docs/qa/phase-5-lighthouse-baseline.md`) — methodology, target scores, key metrics, measurement instructions.
+- **Browser/device QA doc** (`docs/qa/phase-5-browser-device-qa.md`) — test matrix for 6 browsers/devices, responsive breakpoint expectations, how-to guide.
+- **Accessibility QA doc** (`docs/qa/phase-5-accessibility-qa.md`) — VoiceOver/NVDA/JAWS matrix, keyboard nav checklist, axe-core scan table, WCAG 2.1 AA commitments.
+- **Privacy consent approval doc** (`docs/decisions/privacy-consent-approval.md`) — consent copy committed for legal review; sign-off status tracked per item.
+- **Branch protection doc updated** (`docs/security/branch-protection.md`) — required GitHub settings, release process, hotfix process.
+
+## Remaining Before Full Production Sign-Off
+
+- Run Lighthouse against production and record real scores in `docs/qa/phase-5-lighthouse-baseline.md`.
+- Complete browser/device QA across all 6 matrix entries and update `docs/qa/phase-5-browser-device-qa.md`.
+- Complete screen reader and keyboard nav QA and update `docs/qa/phase-5-accessibility-qa.md`.
+- Obtain Legal/Privacy sign-off on consent copy and record in `docs/decisions/privacy-consent-approval.md`.
+- Enable branch protection rules on `main` in GitHub settings.
+- Enable email delivery for alerts (requires `TRANSACTIONAL_EMAIL_API_KEY` and legal sign-off).
+- Resume NLP parsing (structured field extraction) — storage pipeline is complete; parser is a future enrichment step.
+- Embedding-based match scoring — deferred pending ADR-004 model decision validation in production.

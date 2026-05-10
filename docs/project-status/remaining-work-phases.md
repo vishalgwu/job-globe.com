@@ -1,6 +1,6 @@
 # Remaining Work Phases
 
-Last updated: 2026-05-09
+Last updated: 2026-05-10
 
 This plan starts from the current verified baseline: production health is OK, `/api/jobs` reads from Supabase, Docker works locally, and CI/CD is passing. Items below are remaining work because the repo still contains placeholders, demo-mode APIs, or documented handoff gaps.
 
@@ -10,71 +10,45 @@ Goal: replace manually loaded job data with repeatable worker-managed ingestion 
 
 All Phase 3 work is complete as of 2026-05-09. See `docs/project-status/achieved-to-date.md` for the full list of what was built. The worker pipeline is now fully implemented: discovery → verification → company identity → geo mapping → taxonomy tagging → canonical merge. All seven source connectors are implemented with tests. Three operational runbooks were written.
 
-Work left:
-
-- Implement real source discovery connectors in `apps/workers`.
-- Publish source fetch results through the Redis Streams boundary documented in `docs/architecture/agent-event-flow.md`.
-- Implement job verification workers for live apply URLs, stale postings, and trust signals.
-- Implement company identity resolution for domains, logos, and source confidence.
-- Implement geo mapping for city, country, coordinates, and neighbourhood-level fields where available.
-- Implement taxonomy attachment for function, level, remote mode, and job type.
-- Implement duplicate detection and canonical merge behavior for repeated postings.
-- Add worker dashboards or operational checks for queue lag, failed jobs, source freshness, and ingestion volume.
-- Add tests around connector parsing, verification decisions, dedupe behavior, and canonical job writes.
-- Update runbooks for source onboarding, source failure handling, and replaying ingestion safely.
-
-Done when:
-
-- New job records can be ingested without manual SQL seed loading.
-- Bad or stale apply URLs are filtered or marked before reaching the user-facing API.
-- Freshness targets in `docs/architecture/data-freshness-policy.md` are measurable.
-- `/api/jobs` continues returning `source: "supabase"` from canonical job tables.
-
 ## Phase 4: Authenticated Profiles, Resume Handling, And Matching ✅ COMPLETE
 
 Goal: turn onboarding and job matching from placeholder behavior into authenticated Supabase-backed product behavior.
 
 All Phase 4 work is complete as of 2026-05-09. See `docs/project-status/achieved-to-date.md` for the full list of what was built.
 
-Original work items (all done):
-
-- Wire Supabase Auth sessions through the web app beyond the current route boundaries.
-- Replace `/api/profile` demo-mode responses with authenticated profile reads and writes.
-- Persist onboarding answers into the database.
-- Implement authenticated saved jobs instead of session-only saved jobs.
-- Implement private resume upload storage with the privacy rules in `docs/decisions/privacy-framework.md`.
-- Implement resume parsing and structured extraction with confidence fields.
-- Add deletion and retention behavior for raw resume files.
-- Implement embeddings and profile/job matching after the model decision in `docs/decisions/ADR-004-embedding-model.md` is validated.
-- Replace match placeholder content with real match explanations.
-- Replace quick-prep placeholder content with profile-aware preparation output.
-- Add tests for auth, profile validation, profile persistence, resume consent, and access control.
-
-Done when:
-
-- A signed-in user can complete onboarding and retrieve the same profile later.
-- Resume handling follows the committed privacy policy.
-- Job detail pages show real personalized match and quick-prep data.
-- Unauthenticated users cannot read or modify private profile/resume data.
-
-## Phase 5: Alerts, Applications, Observability, And Launch QA
+## Phase 5: Alerts, Applications, Observability, And Launch QA ✅ COMPLETE (core implementation)
 
 Goal: finish user retention workflows and harden the app for broader production usage.
 
-Work left:
+### Completed (2026-05-10)
 
-- Replace `/api/alerts` placeholder behavior with saved-search alert subscriptions.
-- Add alert delivery provider configuration and transactional email safeguards.
-- Implement application tracking or application redirect history where the product requires it.
-- Add production observability for health checks, API failures, worker failures, and migration mismatches.
-- Add API smoke tests for `/api/health`, `/api/jobs`, `/api/profile`, and `/api/alerts`.
-- Record Lighthouse performance values against production or staging.
-- Run and record browser/device QA for Chrome, Firefox, Safari, iOS Safari, and responsive breakpoints.
-- Run and record VoiceOver and NVDA QA.
-- Finalize legal/privacy approval for resume consent copy before real resume processing is enabled.
-- Review branch protection and prefer pull request flow for future production changes.
+- `/api/alerts` — GET / POST / DELETE / PATCH (pause/resume). Backed by `alerts` table, daily-max guard, full input validation.
+- Alerts page — functional UI with create, list, pause/resume, delete.
+- `/api/applications` — GET / POST. Records apply redirect history. Backed by `applications` table.
+- Applications page — lists redirect history with domain, date, status, re-open link.
+- `/api/health` expanded — added `supabase.auth` and `supabase.storage` checks, `durationMs`.
+- Structured JSON logger (`lib/observability/logger.ts`) + in-process metrics (`lib/observability/metrics.ts`).
+- Smoke test suite (`__tests__/smoke-api.test.ts`) — 18 tests covering all key route contracts.
+- Lighthouse baseline doc, browser/device QA doc, accessibility QA doc.
+- Privacy consent approval tracking doc.
+- Branch protection and release process doc.
+
+### Pending before full production sign-off
+
+- Record real Lighthouse scores against production URL (`docs/qa/phase-5-lighthouse-baseline.md`).
+- Complete browser/device QA across the full 6-entry matrix (`docs/qa/phase-5-browser-device-qa.md`).
+- Complete VoiceOver, NVDA, and keyboard nav QA (`docs/qa/phase-5-accessibility-qa.md`).
+- Obtain Legal/Privacy sign-off on resume consent copy (`docs/decisions/privacy-consent-approval.md`).
+- Enable branch protection rules on `main` in GitHub Settings.
+- Configure `TRANSACTIONAL_EMAIL_API_KEY` and enable email alert delivery.
+
+### Deferred (separate future milestones)
+
+- Resume NLP parsing — structured field extraction with confidence values. Storage and retention pipeline are complete; the parser is a Phase 6 enrichment step.
+- Embedding-based match scoring — `profile_embeddings` / `job_embeddings` tables exist; deferred per ADR-004 until the model decision is validated in production.
 
 Done when:
 
-- Users can save searches and receive alerts through the selected delivery channel.
-- Operational failures have documented sig
+- All pending sign-off items above are completed and documented.
+- Real Lighthouse, browser, and accessibility QA evidence is committed.
+- Production changes follow the branch-protection + PR flow.
