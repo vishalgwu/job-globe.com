@@ -2,16 +2,14 @@
 
 Updated: 2026-05-11
 
-## Status
+This file is an implementation privacy checklist for the MVP. It is not legal advice and is not legal sign-off.
 
-Draft implementation reference. This is not legal advice and is not legal sign-off.
+The product should remain controlled-demo only until the launch blockers below are fixed.
 
-The current product is acceptable only for controlled demos with synthetic or test data. It is not ready for public launch or unsupervised collection of real resumes.
+## Data In Scope
 
-## Current Privacy-Relevant Data In Code
-
-- Account data: email, Supabase provider subject, role, display name, timestamps, deleted-at field.
-- Profile data: headline, preferred locations, remote preference, work authorization, salary expectation, onboarding preferences, resume consent flag.
+- Account data: email, Supabase subject, role, display name, timestamps, deleted-at field.
+- Profile data: headline, preferred locations, remote preference, work authorization, salary expectation, onboarding answers, resume consent flag.
 - Resume data: raw Storage object key, file hash, raw deletion deadline, parser version, parsed text, parsed profile JSON, confidence JSON, retention flag.
 - Product data: saved jobs, application redirect records, alert subscriptions, notifications.
 - AI/cache data: quick-prep cache rows keyed by job and optional user.
@@ -21,93 +19,67 @@ The current product is acceptable only for controlled demos with synthetic or te
 
 Implemented:
 
-- Authenticated upload route writes raw resume files to Supabase Storage bucket `resumes`.
+- Authenticated upload writes raw resume files to Supabase Storage bucket `resumes`.
 - Object path is scoped under the internal user ID.
 - Upload stores file hash and raw deletion deadline in `resume_extractions`.
 - Signed URLs are short-lived.
-- `DELETE /api/resume` removes the raw object for the current resume and clears `raw_object_key`.
-- Upload and raw-delete actions write audit events.
-- A resume parser worker exists and is intended to extract text and structured profile JSON.
+- `DELETE /api/resume` removes the current raw object and clears `raw_object_key`.
+- Resume upload/delete actions write audit events.
+- A parser worker exists for text extraction and OpenAI structured parsing.
 
-Known defects / gaps:
+Known defects:
 
-- The resume parser currently interprets `<userId>/<file>` as `<bucket>/<path>`, so uploaded files will not download correctly for parsing.
-- Upload route allows `.doc` and `.rtf`, but the extractor supports only `.txt`, `.pdf`, and `.docx`.
-- No parse-status endpoint or UI state exists after upload.
-- No parsed-profile correction UI exists.
+- Parser download logic treats `<userId>/<file>` as `<bucket>/<path>`, so uploaded resumes do not parse end-to-end.
+- Upload allows `.doc` and `.rtf`; extractor support is limited to `.txt`, `.pdf`, and `.docx`.
+- No parse-status endpoint or parsed-profile correction UI exists.
 - Automated raw-file deletion by retention deadline is not proven as a complete Storage cleanup path.
-- Worker tests for resume extraction currently fail.
+- Resume parser tests currently fail.
 
-## Current Account Rights Controls
+## Account Rights
 
 Implemented:
 
-- `GET /api/account` returns JSON export data for profile, resume extraction rows, saved jobs, application records, alerts, and notifications.
+- `GET /api/account` exports profile, resume extraction rows, saved jobs, application records, alerts, and notifications.
 - `DELETE /api/account` route exists.
 
-Known defects / gaps:
+Known defects:
 
-- Account deletion currently references a non-existent `job_applications` table; the schema table is `applications`.
-- Account deletion does not delete raw resume objects from Supabase Storage.
-- Account deletion does not anonymize or remove the internal `users` row.
-- No user-facing account settings page exposes export/delete controls.
-- No parsed-profile correction flow exists.
-- No legal-approved policy text exists.
+- Deletion references non-existent table `job_applications`; the schema table is `applications`.
+- Deletion does not remove raw resume objects from Supabase Storage.
+- Deletion does not anonymize or remove the internal `users` row.
+- No user-facing settings page exposes export/delete controls.
+- No correction flow exists for parsed resume/profile data.
 
-## AI / Subprocessor Notes
+## AI Processing
 
-Current AI paths in code:
+Current AI paths:
 
 - Resume parser sends extracted resume text to OpenAI for structured parsing.
 - Job/profile embedding workers call OpenAI embeddings.
 - `/api/quick-prep` calls OpenAI chat completions and caches the result.
 
-Current issues:
+Privacy issues:
 
-- `/api/quick-prep` includes the full job description in the prompt. The product spec says quick-prep prompts should be minimized to job title/function/company/key skills/user top matching skills, not full raw descriptions or raw resumes.
-- No subprocessor list or Data Processing Addendum evidence is in the repo.
-- No explicit user-facing AI processing disclosure has been legally reviewed.
-
-## Lawful Basis Targets
-
-These are policy targets, not legal conclusions:
-
-- Account and core product data: contract necessity to provide the service.
-- Resume/profile data: explicit consent during onboarding or resume upload.
-- Reliability/security events: legitimate interest, minimized to operational needs.
-- Compliance audit logs: security and legal/compliance interest.
+- `/api/quick-prep` includes full job descriptions. The source product spec calls for minimized prompts using job title/function/company/key skills and the user's top matching skills, not full raw descriptions or raw resumes.
+- No legally reviewed AI/subprocessor disclosure exists.
+- No Data Processing Addendum evidence is stored in the repo.
 
 ## Retention Targets
 
 | Data | Target |
 |---|---|
-| Raw resume files | Default 30 days unless policy changes via `RESUME_RAW_RETENTION_DAYS`; user can delete current raw file. |
-| Parsed resume/profile data | Retain while account is active, unless user deletes account or correction/deletion is implemented. |
+| Raw resume files | Default 30 days through `RESUME_RAW_RETENTION_DAYS`; user can delete the current raw file. |
+| Parsed resume/profile data | Retain while account is active, subject to deletion/correction flows. |
 | Saved jobs, applications, alerts, notifications | Retain while account is active. |
 | Quick-prep cache | API cache defaults to 24 hours. |
-| Audit events | Retention policies exist in code, but full coverage/reporting needs review. |
+| Audit events | Retention policy tables exist; coverage still needs review. |
 
-## Consent UX Requirements
+## Launch Blockers
 
-Implemented:
-
-- Resume upload includes consent language and raw retention language.
-- Work authorization and salary fields are optional.
-- `/privacy` route exists.
-
-Missing or incorrect:
-
-- `/privacy` route is still a draft notice and has not been legally reviewed.
-- Onboarding start does not provide a full notice-at-collection summary.
-- No reviewed policy text for OpenAI processing, retention, export, deletion, correction, and subprocessor handling.
-- No user-facing correction/export/delete settings page.
-
-## Launch-Blocking Privacy Gaps
-
-- Fix account deletion correctness before any real-user launch.
-- Fix resume parser Storage path and retention cleanup.
-- Update `/privacy` route to match code and legal policy.
-- Add parsed-profile correction UI or remove correction claims.
-- Complete Supabase RLS and Storage bucket policy review.
-- Complete legal/privacy review of AI subprocessors and prompt minimization.
-- Confirm audit coverage for resume upload/delete, profile update, save/apply, alert create/delete, account export/delete, worker failure, and retention cleanup.
+- Fix account deletion correctness before collecting real-user resumes.
+- Fix resume parser Storage path handling and raw-file retention cleanup.
+- Update `/privacy` with legal-approved policy text.
+- Add parsed-profile correction or remove any correction claims from user-facing copy.
+- Review Supabase RLS and Storage bucket policies.
+- Minimize quick-prep prompts and document OpenAI processing.
+- Verify audit coverage for resume upload/delete, profile update, saved jobs, apply redirects, alert create/delete, account export/delete, worker failure, and retention cleanup.

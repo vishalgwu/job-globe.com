@@ -1,98 +1,68 @@
 # Jarvis Job Globe
 
-Last audited: 2026-05-11
+Last documentation cleanup: 2026-05-11
 
-Jarvis Job Globe is a startup MVP for geospatial job discovery. The product vision is a globe-first job search experience where students and early-career users can see where jobs cluster, zoom from global demand to city/company/role signals, open a trusted job panel, and apply through official employer or portal links. The longer-term product adds explainable AI matching, resume-aware skill gaps, alerts, and quick interview prep.
+Jarvis Job Globe is a startup MVP for geospatial job discovery. The product helps students and early-career candidates see hiring demand by location, understand their fit, and apply through official employer or job-board links.
 
-This repository is not public-launch ready yet. It contains a strong monorepo foundation, a working Next.js/Supabase job exploration app, database migrations, worker modules, tests, and deployment scaffolding. Several important pieces are still partial or broken and are tracked below so docs match the actual code.
+The source product vision is `docs/whole_project`. This README is the operational entry point for the current repository.
 
-## MVP Status
+## MVP Contract
 
-| MVP area | Status | Evidence / current reality |
-|---|---|---|
-| Globe job discovery | ⚠️ In Progress | Main UI exists in `apps/web`, using React/CSS globe components and image assets. Globe.GL, React Three Fiber, and deck.gl are installed but not active in the main renderer. |
-| Filters and search | ✅ Completed | Category, country, remote mode, job type, posted-window, and text query are wired through Zustand and `/api/jobs`. City is selected through layer navigation. |
-| City company bubbles and job markers | ✅ Completed | `/api/jobs` returns country, city, company bubble, marker, list, and detail modes from `jobs_canonical`. |
-| Right-side job panel and official apply redirect | ✅ Completed | `JobPanel` renders details, match breakdown, quick-prep placeholder data, save action, and `ApplyCTA`; application clicks are recorded for signed-in users before redirect. |
-| Auth and sessions | ✅ Completed | Supabase login/register/session/refresh/logout routes and auth-protected APIs exist. Production sign-off is still pending. |
-| Onboarding profile flow | ✅ Completed | Eight-step onboarding saves profile preferences for authenticated users. Guest/demo persistence is not implemented. |
-| Resume upload and parsing | ⚠️ In Progress | Upload API and resume parser worker exist, but parsing is currently blocked by a storage object-key mismatch, no parse-status API, and no correction UI. |
-| Match percentage and skill-gap explanation | ⚠️ In Progress | Job detail computes a 4-signal preference match from onboarding answers. Worker-side 7-signal scorer exists. Live web scoring does not use resume extraction or pgvector embeddings yet. |
-| Save, track, compare jobs | ⚠️ In Progress | Save works for authenticated users with session-storage fallback. Application tracking records only `redirected`. Compare is not implemented. |
-| Alerts | ⚠️ In Progress | Alert CRUD and worker evaluator exist. UI creates in-app alerts only. Email delivery code exists but has not been verified and likely needs a user-email lookup fix. |
-| Quick-prep toolkit | ⚠️ In Progress | Static quick-prep content renders in the job panel. `/api/quick-prep` exists and caches OpenAI output, but the UI is not wired to it. |
-| Privacy/account controls | ⚠️ In Progress | Export/delete APIs exist, but account deletion has correctness defects. `/privacy` is a draft notice, not a legal-approved policy. |
-| Production readiness | ❌ Not Started | No verified production deployment, security review, load-test baseline, human screen-reader pass, or operational dashboard. |
+The MVP must stay focused on:
 
-## Implemented Surface
+| Capability | Current status |
+|---|---|
+| Global-to-city job discovery map/globe | In progress. A custom React/CSS globe exists; Globe.GL/deck.gl are not active. |
+| Filters for role/category, country/city, remote mode, internship/new-grad/full-time | Mostly implemented. City is mainly selected through map navigation. |
+| City-level company and job signals | Implemented through canonical job/location/company data, with UI simplification still needed. |
+| Right-side job detail panel with official apply redirect | Implemented. |
+| Supabase auth and session handling | Implemented; production security review pending. |
+| Onboarding questions | Implemented for authenticated users. |
+| Resume upload and parsing | Blocked. Upload and parser exist, but Storage key handling breaks parser download. |
+| Explainable match percentage | Partial. Preference-based scoring is live; resume/embedding-aware scoring is not wired into the live job detail path. |
+| Saved jobs, application tracking, and comparison | Partial. Saved jobs and redirect records exist; comparison and lifecycle tracking are missing. |
+| Alerts for saved searches/tracked companies | Partial. CRUD/evaluator exist; email and tracked-company behavior need verification. |
+| Quick-prep toolkit per opened job | Partial. API/cache exist; UI integration and prompt minimization are incomplete. |
 
-- Next.js App Router web app with pages for globe, login, register, onboarding, profile, saved jobs, applications, alerts, and privacy.
-- Supabase-backed API handlers for jobs, auth, profile, resume, saved jobs, applications, alerts, notifications, account export/delete, health, quick-prep, and Greenhouse/Lever webhooks.
-- PostgreSQL schema with 16 migration files and 21 application tables, including pgvector embedding tables, alerts, notifications, quick-prep cache, audit events, and audit retention policies.
-- Python worker package with discovery connectors for Greenhouse, Lever, Adzuna, USAJOBS, EURES, Workable, and SmartRecruiters.
-- Worker modules for URL verification, company identity, geo resolution, taxonomy tagging, duplicate/canonical upsert, resume parsing, job/profile embeddings, alert evaluation, and audit cleanup.
-- Shared TypeScript contracts under `packages/shared-types/typescript`.
-- Docker, Vercel, Railway, GitHub Actions, migration scripts, seed data, and k6 load-test scaffolding.
+Post-MVP ideas such as broad auto-apply, recruiter dashboards, sponsored marketplaces, campus/white-label products, and multi-language expansion must not be treated as current MVP scope.
 
-## Current Blockers
+## Current Reality
 
-- `npm run typecheck` fails because `openai` and `ioredis` are declared in `apps/web/package.json` but are missing from `package-lock.json` and the installed dependency tree.
-- `.github/workflows/ci.yml` still asserts 13 migrations and 17 tables, while the repo now has 16 migrations and 21 tables.
-- `infra/docker/Dockerfile.web` contains a shell-style redirect/conditional on a `COPY` instruction, which is not valid Dockerfile syntax.
-- `resume_parser.worker` interprets uploaded keys like `<userId>/<file>` as `<bucket>/<path>`, so files uploaded to the `resumes` bucket will not download correctly for parsing.
-- `/api/account` deletes from a non-existent `job_applications` table, does not remove raw resume objects from Supabase Storage, and does not anonymize or delete the internal `users` row.
-- Active worker loops still use legacy Redis `XREAD`; consumer-group, ack, retry, and DLQ helpers are present but not wired into the running pipeline.
-- Web job-detail scoring does not call `fetchEmbeddingScore()`, so pgvector embeddings are generated but not used in live match scores.
-- `/api/quick-prep` sends full job descriptions to OpenAI, which conflicts with the MVP spec's stricter prompt-minimization rule.
-- Alert email delivery is not product-ready: the alerts UI only creates in-app alerts, and the worker email lookup queries `auth.users` using the internal user ID.
-- No API rate limiting, CSP/security headers, OpenTelemetry tracing, admin/KPI dashboard, runbooks, load-test results, human screen-reader pass, or legal/privacy sign-off.
+This repository is not launch-ready. It contains a useful foundation, but build, worker, privacy, and integration blockers remain.
 
-## Tech Stack
+Verified working:
 
-- Frontend: Next.js App Router, React, TypeScript, CSS, Zustand.
-- Web API: Next.js route handlers.
-- Auth, database, storage: Supabase.
-- Database: PostgreSQL 15, JSONB, GIN indexes, pgvector.
-- Workers: Python, Pydantic, psycopg, Redis, httpx, OpenAI SDK, structlog.
-- Queue/cache: Redis Streams helpers and stream publishing; reliable consumer groups are scaffolded but not active in worker loops.
-- AI: OpenAI SDK is referenced for quick-prep, resume extraction, and embeddings, but dependency and runtime integration need repair.
-- Testing: Vitest for web unit/API tests, pytest/mypy/ruff for workers, SQL migration validation.
-- Infrastructure: Docker Compose, Dockerfiles, Vercel config, Railway config, GitHub Actions, k6 script.
+- Next.js App Router web app and Supabase-backed API routes.
+- Jobs API backed by `jobs_canonical`.
+- Auth pages, onboarding, saved jobs, application redirect recording, alerts, and notification routes.
+- PostgreSQL migration validation: 16 migration files, 21 application tables, `pgvector`, GIN indexes, resume uniqueness, alerts/notifications, quick-prep cache, and audit retention tables.
+- Python worker modules for discovery, verification, canonicalization, resume parsing, embeddings, alerts, and audit cleanup.
+- Web unit tests pass.
+- Worker mypy passes.
 
-## Repository Structure
+Known blockers:
 
-```text
-apps/
-  web/                 Next.js frontend and API routes
-  workers/             Python worker package and tests
-  jarvis-job-globe/    Static prototype/reference app, not the production app
-packages/
-  database/            SQL migrations, seeds, and migration scripts
-  shared-types/        TypeScript contracts and partial Python contracts
-  config/              Environment templates
-infra/
-  docker/              Docker Compose files and Dockerfiles
-  scripts/             Migration, seed, and deployment helper scripts
-  terraform/           Placeholder Terraform files
-  load-tests/          k6 load-test script
-docs/
-  whole_project/       Reference DOCX product vision/spec/build plan
-  md/                  Maintained architecture, status, handoff, gap docs
-  decisions/           ADRs and privacy framework
-  qa/                  QA evidence and artifacts
-```
+- `npm run typecheck` fails because `openai` and `ioredis` are declared but missing from the lockfile/installed dependency tree.
+- Worker ruff and pytest are not green.
+- Resume parsing is not end-to-end functional.
+- Account deletion is privacy-critical and currently incorrect.
+- Active Redis worker loops still use legacy `XREAD`; consumer-group/DLQ helpers are scaffolded but not wired.
+- Quick-prep UI integration, prompt minimization, and live embedding-aware match scoring are incomplete.
+- CI database assertions, web Dockerfile syntax, production security headers/rate limits, deployment proof, load-test baseline, accessibility pass, and legal privacy review are missing.
+
+## Retained Markdown Docs
+
+Only these Markdown files are intentionally retained:
+
+- `README.md` - product anchor, MVP scope, setup, and current repository truth.
+- `docs/md/architecture.md` - current implementation map and technical blockers.
+- `docs/decisions/privacy-framework.md` - privacy constraints and launch blockers.
+- `packages/config/README.md` - environment-template notes.
+- `infra/load-tests/README.md` - k6 command reference for the existing load-test script.
+
+The DOCX files in `docs/whole_project` remain the product vision/source specification and are intentionally not duplicated into more Markdown summaries.
 
 ## Local Setup
-
-Requirements:
-
-- Node.js 20 or newer.
-- npm 10 or newer.
-- Python 3.11 or newer.
-- Docker Desktop for local PostgreSQL and Redis services.
-- Root `.env` based on `.env.example`.
-
-Install:
 
 ```powershell
 cd C:\college\Github\Projects\job-globe.com
@@ -109,7 +79,7 @@ Run the web app:
 npm run dev:web
 ```
 
-Run local services:
+Run the local stack:
 
 ```powershell
 npm run dev
@@ -117,44 +87,24 @@ npm run dev
 
 ## Verification Snapshot
 
-Verified on 2026-05-11:
+Last checked during the documentation cleanup:
 
-- ✅ `npm run test --workspace=apps/web`: 5 files, 48 tests passed.
-- ✅ `python packages/database/scripts/validate_migrations.py packages/database/migrations`: passed, 16 files and 21 tables.
-- ✅ `.\.venv-job-globe\Scripts\python.exe -m mypy apps/workers/src`: passed, 56 source files.
-- ❌ `npm run typecheck`: fails because `openai` and `ioredis` are missing from the lockfile/installed dependencies.
-- ❌ `.\.venv-job-globe\Scripts\python.exe -m ruff check apps/workers`: fails on formatting/lint issues in alert evaluator/email, audit cleanup, profile embedder, and resume parser tests.
-- ❌ `.\.venv-job-globe\Scripts\python.exe -m pytest apps/workers/tests`: 98 passed, 5 failed in resume parser tests.
+| Check | Result |
+|---|---|
+| `npm run test --workspace=apps/web` | Passed: 48 tests. |
+| `python packages/database/scripts/validate_migrations.py packages/database/migrations` | Passed: 16 migrations, 21 tables. |
+| `.\.venv-job-globe\Scripts\python.exe -m mypy apps/workers/src` | Passed: 56 files. |
+| `npm run typecheck` | Fails: missing `openai` and `ioredis`. |
+| `.\.venv-job-globe\Scripts\python.exe -m ruff check apps/workers` | Fails: worker lint issues. |
+| `.\.venv-job-globe\Scripts\python.exe -m pytest apps/workers/tests` | Fails: resume parser tests. |
 
-## Roadmap
+## Documentation Discipline
 
-### Phase 1 - Critical MVP Completion
+Do not add Markdown files for brainstorming, future product ideas, duplicated status reports, or handoff notes. Update one of the retained docs, or track work in issues/backlog outside this repo documentation set.
 
-- Fix dependency lockfile so web typecheck/build can resolve `openai` and `ioredis`.
-- Update CI migration/table assertions to 16 migrations and 21 tables.
-- Fix `Dockerfile.web` build syntax.
-- Fix resume parser storage download path and add parse-status visibility.
-- Fix account deletion correctness and raw resume object deletion.
-- Wire quick-prep UI to `/api/quick-prep` or clearly keep it as static MVP content.
-- Add API rate limiting and CSP/security headers.
-- Update the `/privacy` route and complete legal/privacy review.
+Every retained doc must have one clear owner-purpose:
 
-### Phase 2 - Core Feature Expansion
-
-- Wire live web match scoring to pgvector embeddings and parsed resume profiles.
-- Add parsed-profile review/correction UI.
-- Replace legacy Redis reads with consumer groups, acknowledgements, retry, and DLQ handling.
-- Verify and expose alert email delivery, or keep alerts in-app only until email is production-ready.
-- Add application lifecycle states beyond `redirected`.
-- Add runbooks and an admin/KPI dashboard for ingestion, embeddings, alerts, DLQ, and error health.
-
-### Phase 3 - UI/UX, Performance, And Scaling
-
-- Decide whether to complete Globe.GL/deck.gl integration or formally accept the custom React/CSS globe renderer.
-- Run Lighthouse, real-device mobile QA, human screen-reader QA, and k6 load tests.
-- Add OpenTelemetry traces and production monitoring.
-- Calibrate match scoring from human review and real behavior signals.
-- Replace or remove placeholder Terraform.
-- Prepare production deployment and rollback proof for Vercel + Railway.
-
-See [project-gap-analysis.md](docs/md/project-gap-analysis.md) for the detailed phase plan.
+- Product scope belongs in this README and the DOCX source specs.
+- Technical implementation truth belongs in `docs/md/architecture.md`.
+- Privacy/legal launch constraints belong in `docs/decisions/privacy-framework.md`.
+- Package-local commands or templates may stay beside the package they support.
