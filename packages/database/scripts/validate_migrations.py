@@ -21,6 +21,7 @@ EXPECTED_FILES = [
     "014_resume_extractions_user_unique.sql",
     "015_alert_deliveries_and_quick_prep.sql",
     "016_audit_retention.sql",
+    "017_privacy_data_safety.sql",
 ]
 EXPECTED_TABLES = {
     "users", "auth_sessions", "profiles", "resume_extractions", "companies", "locations",
@@ -62,9 +63,21 @@ def main(migrations_dir: str) -> int:
     if "audit_retention_policies" not in sql:
         print("Expected audit_retention_policies table is missing")
         return 1
+    if "delete_internal_account" not in sql:
+        print("Expected atomic account deletion function is missing")
+        return 1
+    if "ALTER TABLE resume_extractions\n  ADD COLUMN IF NOT EXISTS parsed_at" not in sql:
+        print("Expected resume parsed_at retention marker is missing")
+        return 1
+    if "ALTER TABLE users ENABLE ROW LEVEL SECURITY" not in sql:
+        print("Expected user-owned table RLS is missing")
+        return 1
+    if "resumes_users_select_own" not in sql:
+        print("Expected resumes storage policies are missing")
+        return 1
     print(
-        "Migration validation passed: 16 files, 21 tables, pgvector, GIN indexes, "
-        "resume uniqueness, alert deliveries, and audit retention present."
+        "Migration validation passed: 17 files, 21 tables, pgvector, GIN indexes, "
+        "resume uniqueness, alert deliveries, audit retention, and privacy hardening present."
     )
     return 0
 

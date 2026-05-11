@@ -453,6 +453,7 @@ function formatSalaryRange(salaryRange: JobDetail["salaryRange"]): string | null
 import type { OnboardingAnswers } from "@job-globe/shared-types";
 import {
   buildMatchBreakdown,
+  fetchEmbeddingScore,
   type JobSnapshot,
   type ProfileSnapshot,
 } from "../match/scorer";
@@ -460,12 +461,22 @@ import {
 /**
  * Fetch a single job detail and compute personalised match + quick-prep.
  *
+ * Match scoring strategy (blended):
+ *   1. Fetch embedding cosine similarity from job_embeddings + profile_embeddings
+ *      if both rows exist (70% weight).
+ *   2. Rule-based preference scoring (30% weight, or 100% if no embeddings).
+ *
+ * @param profileId — The `profiles.id` UUID (not the user ID). Pass it when
+ *   you have it so the embedding blending path can attempt a cosine lookup.
+ *   If omitted or null, scoring falls back to rule-based only.
+ *
  * If `profile` is null (unauthenticated), returns the same placeholder data
  * that was present before Phase 4 so the UI degrades gracefully.
  */
 export async function getJobDetailWithProfile(
   jobId: string,
   profile: OnboardingAnswers | null,
+  profileId?: string | null,
 ): Promise<JobDetail | null> {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
@@ -508,7 +519,7 @@ export async function getJobDetailWithProfile(
     return base;
   }
 
-  // ── Real match breakdown ────────────────────────────────────────────────
+  // ── Real match breakdown ─────────────────────────────────────────────────
   const taxFunctions = (row.job_taxonomy_links ?? [])
     .map((l) => l.job_taxonomy)
     .filter((t) => t?.category === "function")
@@ -532,7 +543,20 @@ export async function getJobDetailWithProfile(
     taxonomy_functions: taxFunctions,
   };
 
-  const matchBreakdown = buildMatchBreakdown(profileSnap, jobSnap);
+  // ── Attempt to blend in embedding cosine similarity ──────────────────────
+  // profileId is the profiles.id UUID (not the auth user ID). If the
+  // profile_embedder worker hasn't run yet for this profile, fetchEmbeddingScore
+  // returns null and we fall back to rule-only scoring.
+  let embeddingScore: number | null = null;
+  if (profileId) {
+    try {
+      embeddingScore = await fetchEmbeddingScore(jobId, profileId, supabase);
+    } catch {
+      // Non-fatal — degrade to rule-based only
+    }
+  }
+
+  const matchBreakdown = buildMatchBreakdown(profileSnap, jobSnap, embeddingScore ?? undefined);
 
   // ── Profile-aware quick prep ────────────────────────────────────────────
   const jobSkills = (row.required_skills ?? []).map((s: string) => s.toLowerCase());

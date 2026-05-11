@@ -29,7 +29,13 @@ from job_globe_workers.db.connection import get_pool
 from job_globe_workers.db.repositories.agent_runs import finish_agent_run, start_agent_run
 from job_globe_workers.db.repositories.audit import record_worker_failure
 from job_globe_workers.db.repositories.jobs import mark_raw_job_verified, upsert_raw_job
-from job_globe_workers.event_bus.consumer import read_events
+from job_globe_workers.event_bus.consumer import (
+    ack_event,
+    ensure_consumer_group,
+    publish_to_dlq,
+    read_group_events,
+    read_pending_events,
+)
 from job_globe_workers.event_bus.producer import publish_event
 from job_globe_workers.settings import settings
 
@@ -122,44 +128,101 @@ def _process_event(event: dict[str, Any], pool: Any) -> bool:
     return True
 
 
-def run_verification_loop(stop_event: threading.Event) -> None:
-    """Consume the discovery stream and verify jobs until stop_event is set."""
-    pool = get_pool()
-    last_id = "0-0"
+def _run_one_batch(
+    stream: str,
+    group: str,
+    consumer: str,
+    pool: object,
+    stop_event: threading.Event,
+) -> tuple[int, int]:
+    """Process one batch of new + stale messages. Returns (processed, failed)."""
     processed = 0
     failed = 0
-    logger.info("verification.loop.started")
+    batch_processed = 0
 
-    with pool.connection() as conn:
+    # 1. Reclaim stale pending messages first (at-least-once delivery)
+    for msg_id, payload, delivery_count in read_pending_events(
+        stream, group, consumer, min_idle_ms=60_000
+    ):
+        if stop_event.is_set():
+            break
+        if delivery_count > settings.redis_max_retries:
+            logger.error(
+                "verification.dlq",
+                msg_id=msg_id,
+                delivery_count=delivery_count,
+            )
+            publish_to_dlq(stream, msg_id, payload, "max_retries_exceeded")
+            ack_event(stream, group, msg_id)
+            failed += 1
+            continue
+        try:
+            event = _deserialise_event(payload)
+            forwarded = _process_event(event, pool)
+            if forwarded:
+                processed += 1
+            ack_event(stream, group, msg_id)
+            batch_processed += 1
+        except Exception as exc:  # noqa: BLE001
+            failed += 1
+            logger.error("verification.pending_event_error", msg_id=msg_id, error=str(exc))
+            record_worker_failure(
+                pool,  # type: ignore[arg-type]
+                agent_name="verification",
+                error=exc,
+                metadata={"messageId": msg_id},
+            )
+
+    # 2. Read new messages
+    for msg_id, payload in read_group_events(stream, group, consumer):
+        if stop_event.is_set():
+            break
+        try:
+            event = _deserialise_event(payload)
+            forwarded = _process_event(event, pool)
+            if forwarded:
+                processed += 1
+            ack_event(stream, group, msg_id)
+            batch_processed += 1
+        except Exception as exc:  # noqa: BLE001
+            failed += 1
+            logger.error("verification.event_error", msg_id=msg_id, error=str(exc))
+            record_worker_failure(
+                pool,  # type: ignore[arg-type]
+                agent_name="verification",
+                error=exc,
+                metadata={"messageId": msg_id},
+            )
+
+    return processed, failed
+
+
+def run_verification_loop(stop_event: threading.Event) -> None:
+    """Consume the discovery stream using consumer groups and verify jobs."""
+    pool = get_pool()
+    group = settings.redis_consumer_group
+    consumer = settings.redis_consumer_name
+    stream = settings.discovery_stream
+    processed = 0
+    failed = 0
+    logger.info("verification.loop.started", group=group, consumer=consumer)
+
+    ensure_consumer_group(stream, group)
+
+    with pool.connection() as conn:  # type: ignore[union-attr]
         run_id = start_agent_run(conn, agent_name="verification")
         conn.commit()
 
     try:
         while not stop_event.is_set():
-            for msg_id, payload in read_events(settings.discovery_stream, last_id):
-                if stop_event.is_set():
-                    break
-                try:
-                    event = _deserialise_event(payload)
-                    forwarded = _process_event(event, pool)
-                    if forwarded:
-                        processed += 1
-                    last_id = msg_id
-                except Exception as exc:  # noqa: BLE001
-                    failed += 1
-                    logger.error(
-                        "verification.event_error",
-                        msg_id=msg_id,
-                        error=str(exc),
-                    )
-                    record_worker_failure(
-                        pool,
-                        agent_name="verification",
-                        error=exc,
-                        metadata={"messageId": msg_id},
-                    )
+            p, f = _run_one_batch(stream, group, consumer, pool, stop_event)
+            processed += p
+            failed += f
+            if p == 0 and f == 0:
+                # No messages — back off briefly before polling again
+                stop_event.wait(timeout=settings.worker_poll_interval_seconds)
     finally:
-        with pool.connection() as conn:
+        with pool.connection() as conn:  # type: ignore[union-attr]
             finish_agent_run(
                 conn,
                 run_id=run_id,

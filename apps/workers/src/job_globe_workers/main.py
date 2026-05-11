@@ -8,7 +8,7 @@ Thread topology:
        --> verification_thread     (discovery stream -> verification stream)
        --> company_id_thread       (verification stream -> companies table + canonical stream)
        --> dedupe_thread           (canonical stream -> jobs_canonical + taxonomy)
-       --> resume_parser_thread    (resume_extractions -> parsed_text + parsed_profile)
+       --> resume_parser_thread    (resume_extractions -> parsed_profile)
        --> job_embedder_thread     (jobs_canonical -> job_embeddings)
        --> profile_embedder_thread (profiles -> profile_embeddings)
        --> alert_evaluator_thread  (alerts -> alert_deliveries + notifications)

@@ -6,6 +6,19 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
+// Allowed lifecycle statuses (ordered by pipeline stage)
+const VALID_STATUSES = [
+  "redirected",    // clicked Apply — initial state
+  "applied",       // confirmed submission on employer site
+  "assessment",    // online assessment / take-home
+  "interviewing",  // phone/video/onsite interview stage
+  "offer",         // received an offer
+  "rejected",      // rejected at any stage
+  "withdrawn",     // candidate withdrew their application
+] as const;
+
+type ApplicationStatus = (typeof VALID_STATUSES)[number];
+
 export async function GET(request: NextRequest) {
   const user = await resolveRequestUser(request);
   if (!user) {
@@ -110,6 +123,105 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, application: data }, { status: 201 });
   } catch (err) {
     console.error("[applications] POST error:", err);
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
+  }
+}
+
+// ── PATCH /api/applications?id=<uuid> — update status ───────────────────────
+// Allows the user to advance an application through the lifecycle stages.
+
+export async function PATCH(request: NextRequest) {
+  const user = await resolveRequestUser(request);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const id = request.nextUrl.searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "id query parameter is required." }, { status: 400 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  const { status, notes } = body as Record<string, unknown>;
+
+  if (!status || typeof status !== "string" || !VALID_STATUSES.includes(status as ApplicationStatus)) {
+    return NextResponse.json(
+      {
+        error: `status must be one of: ${VALID_STATUSES.join(", ")}.`,
+      },
+      { status: 400 },
+    );
+  }
+
+  const notesValue =
+    typeof notes === "string" && notes.trim().length > 0
+      ? notes.trim().slice(0, 1000) // cap at 1000 chars
+      : null;
+
+  try {
+    const supabase = createServerSupabaseClient();
+
+    // Fetch current row to enforce ownership + provide previous status for audit
+    const { data: existing, error: fetchError } = await supabase
+      .from("applications")
+      .select("id, job_id, status, metadata")
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (fetchError) {
+      console.error("[applications] PATCH fetch failed:", fetchError.message);
+      return NextResponse.json({ error: "Failed to load application." }, { status: 500 });
+    }
+
+    if (!existing) {
+      return NextResponse.json({ error: "Application not found." }, { status: 404 });
+    }
+
+    // Merge notes into metadata (alongside existing metadata)
+    const existingMeta =
+      existing.metadata && typeof existing.metadata === "object" && !Array.isArray(existing.metadata)
+        ? (existing.metadata as Record<string, unknown>)
+        : {};
+    const updatedMeta: Record<string, unknown> = {
+      ...existingMeta,
+      ...(notesValue !== null ? { notes: notesValue } : {}),
+    };
+
+    const { data, error } = await supabase
+      .from("applications")
+      .update({ status, metadata: updatedMeta })
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .select("id, job_id, apply_url, status, applied_at, metadata")
+      .single();
+
+    if (error) {
+      console.error("[applications] PATCH update failed:", error.message);
+      return NextResponse.json({ error: "Failed to update application." }, { status: 500 });
+    }
+
+    await recordAuditEvent(supabase, request, {
+      actorUserId: user.id,
+      eventType: "application.status_updated",
+      subjectType: "job",
+      subjectId: existing.job_id,
+      metadata: {
+        applicationId: id,
+        previousStatus: existing.status,
+        newStatus: status,
+      },
+    });
+
+    return NextResponse.json({ ok: true, application: data });
+  } catch (err) {
+    console.error("[applications] PATCH error:", err);
     return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

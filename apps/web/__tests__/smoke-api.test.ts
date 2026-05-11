@@ -220,7 +220,9 @@ describe("POST /api/alerts — input validation", () => {
     const { POST } = await import("../app/api/alerts/route");
     mockFrom.mockReturnValue({
       select: () => ({ eq: () => ({ eq: () => ({ count: 0, error: null }) }) }),
-      insert: () => ({ select: () => ({ single: () => ({ data: null, error: { message: "err" } }) }) }),
+      insert: () => ({
+        select: () => ({ single: () => ({ data: null, error: { message: "err" } }) }),
+      }),
     });
 
     const request = makeRequest("/api/alerts", {
@@ -279,5 +281,30 @@ describe("POST /api/applications — input validation", () => {
     });
     const response = await POST(request as never);
     expect(response.status).toBe(400);
+  });
+});
+
+// ── /api/resume ── file validation ───────────────────────────────────────────
+
+describe("POST /api/resume — file validation", () => {
+  beforeEach(async () => {
+    const authMod = await import("../lib/supabase/auth");
+    vi.mocked(authMod.resolveRequestUser).mockResolvedValue({
+      id: "user-123",
+      email: "test@example.com",
+    } as never);
+  });
+
+  it("rejects unsupported resume formats before storage upload", async () => {
+    const { POST } = await import("../app/api/resume/route");
+    const formData = new FormData();
+    formData.set("file", new File(["test"], "resume.rtf", { type: "application/rtf" }));
+
+    const request = { formData: vi.fn().mockResolvedValue(formData) };
+    const response = await POST(request as never);
+    const responseBody = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(responseBody.error).toContain("PDF, DOCX, or TXT");
   });
 });

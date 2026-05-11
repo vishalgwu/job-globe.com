@@ -1,9 +1,9 @@
 """Resume parser worker.
 
-Polls resume_extractions for rows where parsed_text IS NULL and
+Polls resume_extractions for rows where parsed_at IS NULL and
 raw_object_key IS NOT NULL.  Downloads the raw file from Supabase Storage,
 extracts text, calls the OpenAI structured-profile extractor, and persists
-the results back to the same row.
+the structured results back to the same row without retaining full raw text.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ import threading
 import time
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 import structlog
@@ -29,6 +30,7 @@ from job_globe_workers.settings import settings
 logger = structlog.get_logger(__name__)
 
 _PARSER_VERSION = "1.0.0"
+_RESUME_BUCKET = "resumes"
 
 # ---------------------------------------------------------------------------
 # Supabase Storage download
@@ -46,19 +48,15 @@ def _supabase_service_key() -> str:
 def _download_object(object_key: str) -> bytes:
     """Download a file from Supabase Storage and return its raw bytes.
 
-    The object_key is expected to be in the form  <bucket>/<path>.
-    Falls back to treating the whole string as a path under 'resumes'.
+    Uploads store keys as paths inside the private ``resumes`` bucket:
+    ``<internal_user_id>/<uuid>.<ext>``. Legacy ``resumes/<path>`` keys are
+    tolerated, but arbitrary first path segments are not treated as buckets.
     """
     base_url = _supabase_url().rstrip("/")
     service_key = _supabase_service_key()
+    bucket, path = _storage_bucket_and_path(object_key)
 
-    if "/" in object_key:
-        bucket, _, path = object_key.partition("/")
-    else:
-        bucket = "resumes"
-        path = object_key
-
-    url = f"{base_url}/storage/v1/object/{bucket}/{path}"
+    url = f"{base_url}/storage/v1/object/{bucket}/{quote(path, safe='/')}"
     headers: dict[str, str] = {
         "Authorization": f"Bearer {service_key}",
         "apikey": service_key,
@@ -68,6 +66,50 @@ def _download_object(object_key: str) -> bytes:
         response = client.get(url, headers=headers)
         response.raise_for_status()
         return response.content
+
+
+def _delete_objects(object_keys: list[str]) -> None:
+    """Delete Supabase Storage objects by key."""
+    if not object_keys:
+        return
+
+    base_url = _supabase_url().rstrip("/")
+    service_key = _supabase_service_key()
+    grouped_paths: dict[str, list[str]] = {}
+    for object_key in object_keys:
+        bucket, path = _storage_bucket_and_path(object_key)
+        grouped_paths.setdefault(bucket, []).append(path)
+
+    headers: dict[str, str] = {
+        "Authorization": f"Bearer {service_key}",
+        "apikey": service_key,
+        "Content-Type": "application/json",
+    }
+    with httpx.Client(timeout=30.0) as client:
+        for bucket, paths in grouped_paths.items():
+            url = f"{base_url}/storage/v1/object/{bucket}"
+            response = client.request(
+                "DELETE",
+                url,
+                headers=headers,
+                json={"prefixes": paths},
+            )
+            response.raise_for_status()
+
+
+def _storage_bucket_and_path(object_key: str) -> tuple[str, str]:
+    key = object_key.strip().lstrip("/")
+    if not key:
+        raise ValueError("Resume storage object key is empty.")
+
+    legacy_prefix = f"{_RESUME_BUCKET}/"
+    if key.startswith(legacy_prefix):
+        key = key[len(legacy_prefix) :]
+
+    if not key or key.endswith("/"):
+        raise ValueError(f"Invalid resume storage object key: {object_key!r}")
+
+    return _RESUME_BUCKET, key
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +173,6 @@ def _process_row(row: dict[str, Any]) -> None:
         )
     except Exception as exc:  # noqa: BLE001
         log.error("resume_parser.structured_extraction_failed", error=str(exc))
-        # Still persist the raw text even if structured extraction failed
         profile = None
 
     confidence: dict[str, Any] = profile.pop("confidence", {}) if profile else {}
@@ -143,14 +184,15 @@ def _process_row(row: dict[str, Any]) -> None:
                 """
                 UPDATE resume_extractions
                 SET
-                    parsed_text = %s,
+                    parsed_text = NULL,
                     parsed_profile = %s::jsonb,
                     confidence = %s::jsonb,
-                    parser_version = %s
+                    parser_version = %s,
+                    parsed_at = NOW(),
+                    raw_file_sha256 = NULL
                 WHERE id = %s
                 """,
                 (
-                    parsed_text,
                     json.dumps(profile),
                     json.dumps(confidence),
                     _PARSER_VERSION,
@@ -161,10 +203,16 @@ def _process_row(row: dict[str, Any]) -> None:
             conn.execute(
                 """
                 UPDATE resume_extractions
-                SET parsed_text = %s, parser_version = %s
+                SET
+                    parsed_text = NULL,
+                    parsed_profile = '{}'::jsonb,
+                    confidence = '{}'::jsonb,
+                    parser_version = %s,
+                    parsed_at = NOW(),
+                    raw_file_sha256 = NULL
                 WHERE id = %s
                 """,
-                (parsed_text, _PARSER_VERSION, row_id),
+                (_PARSER_VERSION, row_id),
             )
         conn.commit()
 
@@ -188,7 +236,7 @@ def _fetch_pending_rows(limit: int = 10) -> list[dict[str, Any]]:
             """
             SELECT id, user_id, raw_object_key
             FROM resume_extractions
-            WHERE parsed_text IS NULL
+            WHERE parsed_at IS NULL
               AND raw_object_key IS NOT NULL
             ORDER BY created_at
             LIMIT %s
@@ -198,11 +246,70 @@ def _fetch_pending_rows(limit: int = 10) -> list[dict[str, Any]]:
     return [{"id": r[0], "user_id": r[1], "raw_object_key": r[2]} for r in rows]
 
 
+def _delete_expired_raw_resumes(limit: int = 25) -> int:
+    """Delete expired raw resume files and clear raw-file metadata."""
+    pool = get_pool()
+    with pool.connection() as conn:
+        rows: list[Any] = conn.execute(
+            """
+            SELECT id, raw_object_key
+            FROM resume_extractions
+            WHERE raw_object_key IS NOT NULL
+              AND raw_delete_after IS NOT NULL
+              AND raw_delete_after < NOW()
+              AND user_retained = false
+            ORDER BY raw_delete_after
+            LIMIT %s
+            """,
+            (limit,),
+        ).fetchall()
+
+    deleted = 0
+    for row in rows:
+        row_id = str(row[0])
+        object_key = str(row[1])
+        try:
+            _delete_objects([object_key])
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "resume_parser.retention_storage_delete_failed",
+                row_id=row_id,
+                error=str(exc),
+            )
+            continue
+
+        with pool.connection() as conn:
+            conn.execute(
+                """
+                UPDATE resume_extractions
+                SET
+                    raw_object_key = NULL,
+                    raw_file_sha256 = NULL,
+                    raw_delete_after = NULL,
+                    parsed_text = NULL,
+                    user_retained = false
+                WHERE id = %s
+                """,
+                (row_id,),
+            )
+            conn.commit()
+        deleted += 1
+
+    if deleted:
+        logger.info("resume_parser.retention_cleanup_complete", deleted=deleted)
+    return deleted
+
+
 def run_resume_parser_loop(stop_event: threading.Event) -> None:
     """Poll for unprocessed resumes and parse them until stop_event is set."""
     logger.info("resume_parser.loop.started")
 
     while not stop_event.is_set():
+        try:
+            _delete_expired_raw_resumes(limit=25)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("resume_parser.retention_cleanup_failed", error=str(exc))
+
         try:
             pending = _fetch_pending_rows(limit=10)
         except Exception as exc:  # noqa: BLE001

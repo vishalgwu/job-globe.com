@@ -4,11 +4,62 @@ on:
   push:
     branches: [main]
 
+# Only one deployment at a time — cancel in-progress if a new push arrives.
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: true
+
 jobs:
-  deployment-placeholder:
+  # ── Web: build and deploy to Vercel (staging) ─────────────────────────────
+  deploy-web:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+      - name: Pull Vercel environment (staging)
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Build for staging
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Deploy to staging
+        id: deploy
+        run: |
+          DEPLOY_URL=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+      - name: Smoke-test staging health endpoint
+        run: |
+          sleep 10
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.deploy.outputs.url }}/api/health")
+          if [ "$STATUS" != "200" ]; then
+            echo "Health check failed with status $STATUS"
+            exit 1
+          fi
+          echo "Health check passed (HTTP $STATUS)"
+
+  # ── Workers: build Docker image and deploy to Railway ─────────────────────
+  deploy-workers:
     runs-on: ubuntu-latest
     environment: staging
     steps:
       - uses: actions/checkout@v4
-      - name: Deployment handoff
-        run: echo "Connect this job to the selected staging platform after provider secrets are configured."
+      - name: Deploy workers to Railway
+        # Railway CLI will pick up RAILWAY_TOKEN from the environment.
+        # Set RAILWAY_TOKEN in the staging GitHub environment secrets.
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "RAILWAY_TOKEN not configured — skipping worker deploy."
+            exit 0
+          fi
+          npm install -g @railway/cli
+          railway up --service workers --detach

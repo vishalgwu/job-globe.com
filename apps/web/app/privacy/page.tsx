@@ -15,7 +15,7 @@ export default function PrivacyPage() {
             <li>Account identifiers from Supabase Auth and the internal users table.</li>
             <li>Profile preferences saved from onboarding.</li>
             <li>Raw resume files uploaded by authenticated users.</li>
-            <li>Parsed resume text/profile data when the worker pipeline is operating.</li>
+            <li>Structured resume profile data produced by the parser worker.</li>
             <li>Saved jobs, application redirect records, and alert subscriptions.</li>
             <li>In-app notifications and quick-prep cache records.</li>
             <li>System audit events for sensitive user and worker actions.</li>
@@ -31,24 +31,22 @@ export default function PrivacyPage() {
             users delete the raw stored object.
           </p>
           <p>
-            Raw resume retention is controlled by <code>RESUME_RAW_RETENTION_DAYS</code>, defaulting
-            to 30 days. The worker code includes retention cleanup for audit events, but automated
-            raw resume Storage cleanup still needs end-to-end verification.
+            Uploads are limited to PDF, DOCX, and TXT files. The parser uses raw resume text only
+            during processing and stores the structured profile output without retaining the full
+            parsed text or a raw file fingerprint.
           </p>
           <p>
-            The repository includes a resume parser worker for PDF, DOCX, and text extraction, but
-            the current upload-to-parser handoff needs repair before resume parsing can be treated
-            as production-ready.
+            Raw resume retention is controlled by <code>RESUME_RAW_RETENTION_DAYS</code>, defaulting
+            to 30 days. The worker deletes expired raw Storage objects and clears raw-file metadata
+            after successful storage deletion.
           </p>
         </section>
 
         <section>
           <h2>Current Limits</h2>
           <ul>
-            <li>Structured resume parsing exists in worker code but is not currently verified end to end.</li>
             <li>
-              Account export and deletion routes exist, but account deletion needs correctness fixes
-              before public launch.
+              Structured resume parsing depends on worker availability and OpenAI configuration.
             </li>
             <li>Parsed-profile correction is not implemented.</li>
             <li>Alert email delivery and AI-generated quick-prep need production verification.</li>
@@ -63,6 +61,7 @@ export default function PrivacyPage() {
             <li>Users can delete the raw resume file from the profile page.</li>
             <li>Users can delete saved jobs and alerts.</li>
             <li>Authenticated users can request a JSON account export through the account API.</li>
+            <li>Authenticated users can delete their account and associated app data.</li>
           </ul>
         </section>
       </section>

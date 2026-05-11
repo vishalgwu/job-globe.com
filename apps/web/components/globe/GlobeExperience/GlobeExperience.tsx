@@ -340,14 +340,14 @@ export function GlobeExperience() {
             </section>
           </aside>
 
-          <section className="map-viewport" aria-label="Interactive job globe">
-            <div className="map-status">
+          <section className="map-viewport" aria-label="Interactive job globe" aria-busy={isLoading}>
+            <div className="map-status" aria-live="polite" aria-atomic="true">
               <span>{summary.breadcrumb}</span>
               <strong>
-                {isLoading ? "Loading signals" : `${summary.plottedSignals} plotted signals`}
+                {isLoading ? "Loading signals…" : `${summary.plottedSignals} plotted signals`}
               </strong>
             </div>
-            {error ? <p className="error-text globe-error">{error}</p> : null}
+            {error ? <p className="error-text globe-error" role="alert">{error}</p> : null}
             {showFallback ? (
               <FallbackMap
                 activeLayer={activeLayer}
@@ -384,12 +384,14 @@ export function GlobeExperience() {
             <div
               className={`jobs-list-panel ${listMode ? "is-open" : ""}`}
               id="globe-list-mode"
-              aria-live="polite"
+              role="region"
+              aria-label="Accessible job list"
+              aria-expanded={listMode}
             >
               <div className="list-panel-head">
                 <h2>Accessible job list</h2>
-                <button type="button" onClick={() => setListMode(false)}>
-                  Close
+                <button type="button" aria-label="Close job list" onClick={() => setListMode(false)}>
+                  <span aria-hidden="true">✕</span>
                 </button>
               </div>
               <div className="job-list">

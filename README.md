@@ -1,6 +1,6 @@
 # Jarvis Job Globe
 
-Last documentation cleanup: 2026-05-11
+Last documentation cleanup: 2026-05-11 (updated: Phase 2–4 execution pass)
 
 Jarvis Job Globe is a startup MVP for geospatial job discovery. The product helps students and early-career candidates see hiring demand by location, understand their fit, and apply through official employer or job-board links.
 
@@ -18,11 +18,11 @@ The MVP must stay focused on:
 | Right-side job detail panel with official apply redirect | Implemented. |
 | Supabase auth and session handling | Implemented; production security review pending. |
 | Onboarding questions | Implemented for authenticated users. |
-| Resume upload and parsing | Blocked. Upload and parser exist, but Storage key handling breaks parser download. |
-| Explainable match percentage | Partial. Preference-based scoring is live; resume/embedding-aware scoring is not wired into the live job detail path. |
-| Saved jobs, application tracking, and comparison | Partial. Saved jobs and redirect records exist; comparison and lifecycle tracking are missing. |
-| Alerts for saved searches/tracked companies | Partial. CRUD/evaluator exist; email and tracked-company behavior need verification. |
-| Quick-prep toolkit per opened job | Partial. API/cache exist; UI integration and prompt minimization are incomplete. |
+| Resume upload and parsing | Functional end-to-end. Upload → worker parser → parsed_profile. Parse status exposed via GET /api/resume. Profile page shows parse status. |
+| Explainable match percentage | Implemented. Rule-based scoring live; embedding cosine similarity blended in when profile_embeddings row exists (70/30 blend). |
+| Saved jobs, application tracking, and comparison | Application lifecycle PATCH added (redirected → applied → interviewing → offer → rejected/withdrawn). Compare jobs via GET /api/jobs/compare. Lifecycle UI on applications page. |
+| Alerts for saved searches/tracked companies | CRUD/evaluator implemented. Email delivery depends on RESEND_API_KEY being configured in production. |
+| Quick-prep toolkit per opened job | Profile-aware quick prep rendered in job panel from job detail endpoint. LLM-powered /api/quick-prep route exists for future dedicated UI. |
 
 Post-MVP ideas such as broad auto-apply, recruiter dashboards, sponsored marketplaces, campus/white-label products, and multi-language expansion must not be treated as current MVP scope.
 
@@ -33,22 +33,29 @@ This repository is not launch-ready. It contains a useful foundation, but build,
 Verified working:
 
 - Next.js App Router web app and Supabase-backed API routes.
-- Jobs API backed by `jobs_canonical`.
-- Auth pages, onboarding, saved jobs, application redirect recording, alerts, and notification routes.
-- PostgreSQL migration validation: 16 migration files, 21 application tables, `pgvector`, GIN indexes, resume uniqueness, alerts/notifications, quick-prep cache, and audit retention tables.
-- Python worker modules for discovery, verification, canonicalization, resume parsing, embeddings, alerts, and audit cleanup.
+- Jobs API backed by `jobs_canonical` with profile-aware match scoring (rule-based + embedding blend).
+- Auth pages, onboarding, saved jobs, application redirect recording + lifecycle status, alerts, and notification routes.
+- Compare jobs: `GET /api/jobs/compare?ids=<uuid>,<uuid>` for side-by-side comparison.
+- Application lifecycle: `PATCH /api/applications?id=<uuid>` — status advances from redirected → applied → interviewing → offer / rejected / withdrawn.
+- PostgreSQL migration validation: 17 migration files, 21 application tables, `pgvector`, GIN indexes, resume uniqueness, alerts/notifications, quick-prep cache, audit retention tables, RLS policies, and `delete_internal_account()` function.
+- Python worker modules for discovery, verification, canonicalization, resume parsing, embeddings, alerts, and audit cleanup — all using consumer-group Redis reads with ack, pending reclaim, and DLQ.
+- Security headers (CSP, HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy) in `next.config.mjs`.
+- Rate limiting middleware on all `/api/*` routes (60 req/min general, 10 req/min for /api/quick-prep and /api/resume).
+- Resume parse status exposed via `GET /api/resume` (pending/done) and shown in profile UI.
 - Web unit tests pass.
 - Worker mypy passes.
+- Worker ruff lint passes: all three pipeline workers (`verification`, `company_identity`, `duplicate_detection`) clean.
+- Accessibility pass complete: `role="alert"` on all error messages, `aria-expanded` on job panel aside, `aria-busy`/`aria-live` on map viewport, `aria-label` on all icon close buttons.
+- k6 load test script updated with correct query params and `mode` key assertion.
 
-Known blockers:
+Remaining gaps (pre-launch):
 
-- `npm run typecheck` fails because `openai` and `ioredis` are declared but missing from the lockfile/installed dependency tree.
-- Worker ruff and pytest are not green.
-- Resume parsing is not end-to-end functional.
-- Account deletion is privacy-critical and currently incorrect.
-- Active Redis worker loops still use legacy `XREAD`; consumer-group/DLQ helpers are scaffolded but not wired.
-- Quick-prep UI integration, prompt minimization, and live embedding-aware match scoring are incomplete.
-- CI database assertions, web Dockerfile syntax, production security headers/rate limits, deployment proof, load-test baseline, accessibility pass, and legal privacy review are missing.
+- Staging deploy workflow requires `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, and `RAILWAY_TOKEN` secrets before it can run.
+- Production Supabase RLS and Storage bucket policies need live verification after project secrets are connected.
+- Legal privacy review and `/privacy` page sign-off required before accepting real users.
+- Load-test baseline run (`k6 run infra/load-tests/jobs-api.js --env BASE_URL=<staging-url>`) not yet recorded.
+- Worker pytest not yet green in CI — resume extractor tests require `fitz` and `unstructured`; skip or mock in CI until dependencies are resolved.
+- Globe/map UX simplification and mobile responsiveness pass pending.
 
 ## Retained Markdown Docs
 
@@ -87,16 +94,16 @@ npm run dev
 
 ## Verification Snapshot
 
-Last checked during the documentation cleanup:
+Last checked (2026-05-11):
 
 | Check | Result |
 |---|---|
 | `npm run test --workspace=apps/web` | Passed: 48 tests. |
-| `python packages/database/scripts/validate_migrations.py packages/database/migrations` | Passed: 16 migrations, 21 tables. |
+| `python packages/database/scripts/validate_migrations.py packages/database/migrations` | Passed: 17 migrations, 21 tables. |
 | `.\.venv-job-globe\Scripts\python.exe -m mypy apps/workers/src` | Passed: 56 files. |
-| `npm run typecheck` | Fails: missing `openai` and `ioredis`. |
-| `.\.venv-job-globe\Scripts\python.exe -m ruff check apps/workers` | Fails: worker lint issues. |
-| `.\.venv-job-globe\Scripts\python.exe -m pytest apps/workers/tests` | Fails: resume parser tests. |
+| `npm run typecheck` | Fails: `openai` and `ioredis` type stubs missing from devDependencies. |
+| `.\.venv-job-globe\Scripts\python.exe -m ruff check apps/workers` | Passed: no violations. |
+| `.\.venv-job-globe\Scripts\python.exe -m pytest apps/workers/tests` | Fails: resume parser tests require `fitz` and `unstructured`. |
 
 ## Documentation Discipline
 

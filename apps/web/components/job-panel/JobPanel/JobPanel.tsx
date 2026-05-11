@@ -15,8 +15,12 @@ interface JobPanelProps {
 
 export function JobPanel({ job, isOpen, isSaved, isLoading, onClose, onSave }: JobPanelProps) {
   return (
-    <aside className={`job-panel ${isOpen ? "is-open" : ""}`} aria-label="Selected job details">
-      {isLoading ? <p className="detail-company">Loading job detail...</p> : null}
+    <aside
+      className={`job-panel ${isOpen ? "is-open" : ""}`}
+      aria-label="Selected job details"
+      aria-expanded={isOpen}
+    >
+      {isLoading ? <p className="detail-company" aria-live="polite" aria-busy={isLoading}>Loading job detail…</p> : null}
       {!job && !isLoading ? (
         <div className="empty-state">
           <p className="eyebrow">No marker selected</p>
@@ -34,7 +38,7 @@ export function JobPanel({ job, isOpen, isSaved, isLoading, onClose, onSave }: J
             aria-label="Close job panel"
             onClick={onClose}
           >
-            X
+            <span aria-hidden="true">✕</span>
           </button>
           <p className="eyebrow">Verified Opening</p>
           <h2>{job.title}</h2>

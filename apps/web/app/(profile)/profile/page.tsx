@@ -15,12 +15,17 @@ interface ResumeState {
   signedUrl: string | null;
   rawDeleteAfter: string | null;
   uploadedAt: string | null;
+  hasRawFile?: boolean;
 }
+
+type ParseStatus = "none" | "pending" | "done";
 
 export default function ProfilePage() {
   const [session, setSession] = useState<SessionState | null>(null);
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [resume, setResume] = useState<ResumeState | null>(null);
+  const [parseStatus, setParseStatus] = useState<ParseStatus>("none");
+  const [parsedAt, setParsedAt] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeletingResume, setIsDeletingResume] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -38,15 +43,19 @@ export default function ProfilePage() {
         setSession(sessionData);
 
         if (sessionData.authenticated) {
-          const profileData = await profileRes.json() as {
+          const profileData = (await profileRes.json()) as {
             profile: ProfileSummary | null;
           };
           setProfile(profileData.profile);
 
-          const resumeData = await resumeRes.json() as {
+          const resumeData = (await resumeRes.json()) as {
             resume: ResumeState | null;
+            parseStatus: ParseStatus;
+            parsedAt: string | null;
           };
           setResume(resumeData.resume);
+          setParseStatus(resumeData.parseStatus ?? "none");
+          setParsedAt(resumeData.parsedAt ?? null);
         }
       } catch {
         // Non-fatal — show unauthenticated state
@@ -175,6 +184,41 @@ export default function ProfilePage() {
 
             <section className="profile-section">
               <h2>Resume</h2>
+
+              {/* Parse status badge */}
+              {parseStatus !== "none" && (
+                <p
+                  className="muted"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    marginBottom: "0.75rem",
+                    fontSize: 13,
+                  }}
+                >
+                  {parseStatus === "done" ? (
+                    <>
+                      <span
+                        aria-label="Parsed"
+                        style={{ color: "var(--color-text-success, #16a34a)" }}
+                      >
+                        ✓
+                      </span>{" "}
+                      Resume parsed
+                      {parsedAt ? ` on ${new Date(parsedAt).toLocaleDateString()}` : ""}.
+                      Match scoring is active.
+                    </>
+                  ) : (
+                    <>
+                      <span aria-label="Pending" style={{ opacity: 0.6 }}>◌</span>{" "}
+                      Resume uploaded — parsing in progress. Match scoring will improve once
+                      complete.
+                    </>
+                  )}
+                </p>
+              )}
+
               {resume?.signedUrl ? (
                 <div className="resume-status">
                   <p>
@@ -208,6 +252,13 @@ export default function ProfilePage() {
                       {isDeletingResume ? "Deleting…" : "Delete raw file"}
                     </button>
                   </div>
+                </div>
+              ) : parseStatus === "done" ? (
+                <div className="resume-status">
+                  <p>
+                    Raw resume file deleted per retention policy. Parsed profile data is retained
+                    for match scoring.
+                  </p>
                 </div>
               ) : (
                 <div className="empty-state">

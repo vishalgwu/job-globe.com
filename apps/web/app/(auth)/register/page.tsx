@@ -120,7 +120,7 @@ export default function RegisterPage() {
             />
           </label>
 
-          {error ? <p className="error-text">{error}</p> : null}
+          {error ? <p className="error-text" role="alert">{error}</p> : null}
 
           <button className="primary-action" type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Creating account…" : "Create Account"}

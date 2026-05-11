@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
       // Resolve the user's profile for personalised match scoring.
       // Falls back to placeholder data for unauthenticated requests.
       let profileAnswers: import("@job-globe/shared-types").OnboardingAnswers | null = null;
+      let profileId: string | null = null;
       try {
         const user = await resolveRequestUser(request);
         if (user) {
@@ -38,13 +39,16 @@ export async function GET(request: NextRequest) {
             .maybeSingle();
           if (profileRow) {
             profileAnswers = rowToAnswers(profileRow);
+            // profiles.id UUID is used to look up profile_embeddings for
+            // cosine-similarity blending in match scoring.
+            profileId = profileRow.id as string;
           }
         }
       } catch {
         // Non-fatal — continue without profile
       }
 
-      const job = jobId ? await getJobDetailWithProfile(jobId, profileAnswers) : null;
+      const job = jobId ? await getJobDetailWithProfile(jobId, profileAnswers, profileId) : null;
 
       if (!job) {
         return NextResponse.json(

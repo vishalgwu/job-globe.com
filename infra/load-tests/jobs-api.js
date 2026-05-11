@@ -17,37 +17,42 @@ export const options = {
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
 
-const FILTERS = [
+// Reflect actual /api/jobs query-string contract:
+//   mode=global|country|city|jobs|detail
+//   country=<ISO2>  (not countryCode, not country_code)
+//   remote=remote|hybrid|on-site
+//   category=<slug>
+//   postedWithin=1hr|6hr|1day|7day|past-month|any-time
+const SCENARIOS = [
   '?mode=global',
   '?mode=country&country=US',
   '?mode=country&country=GB',
   '?mode=country&country=DE',
-  '?mode=jobs&category=Engineering',
-  '?mode=jobs&category=Design',
-  '?mode=jobs&remote_type=remote',
-  '?mode=jobs&remote_type=hybrid',
-  '?mode=jobs&posted_window=7d',
-  '?mode=jobs&posted_window=24h',
   '?mode=city&country=US',
+  '?mode=jobs&category=software-engineering',
+  '?mode=jobs&category=machine-learning',
+  '?mode=jobs&remote=remote',
+  '?mode=jobs&remote=hybrid',
+  '?mode=jobs&postedWithin=7day',
+  '?mode=jobs&postedWithin=1day',
 ];
 
 export default function () {
-  const filter = FILTERS[Math.floor(Math.random() * FILTERS.length)];
-  const url = `${BASE_URL}/api/jobs${filter}`;
+  const qs = SCENARIOS[Math.floor(Math.random() * SCENARIOS.length)];
+  const url = `${BASE_URL}/api/jobs${qs}`;
 
   const res = http.get(url, {
-    headers: {
-      Accept: 'application/json',
-    },
+    headers: { Accept: 'application/json' },
     tags: { name: 'jobs-api' },
   });
 
+  // The API returns { mode, source, jobs|countries|cities|... } — never a 'data' key.
   check(res, {
-    'status is 200':        (r) => r.status === 200,
-    'response has data key': (r) => {
+    'status is 200': (r) => r.status === 200,
+    'response has mode key': (r) => {
       try {
         const body = JSON.parse(r.body);
-        return body !== null && typeof body === 'object' && 'data' in body;
+        return body !== null && typeof body === 'object' && typeof body.mode === 'string';
       } catch {
         return false;
       }

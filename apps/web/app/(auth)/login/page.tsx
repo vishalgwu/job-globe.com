@@ -75,7 +75,7 @@ export default function LoginPage() {
             />
           </label>
 
-          {error ? <p className="error-text">{error}</p> : null}
+          {error ? <p className="error-text" role="alert">{error}</p> : null}
 
           <button className="primary-action" type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Signing in…" : "Sign In"}

@@ -1,10 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { recordAuditEvent } from "@/lib/audit/events";
 import { resolveRequestUser } from "@/lib/supabase/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
+
+const RESUME_BUCKET = "resumes";
+const STORAGE_REMOVE_BATCH_SIZE = 100;
 
 // ── DELETE /api/account — full account deletion ──────────────────────────────
 
@@ -16,125 +20,37 @@ export async function DELETE(request: NextRequest) {
 
   const supabase = createServerSupabaseClient();
 
-  // Step 1: Delete saved_jobs
-  {
-    const { error } = await supabase.from("saved_jobs").delete().eq("user_id", user.id);
-    if (error) {
-      console.error("[account/delete] saved_jobs delete failed:", error.message);
-      return NextResponse.json({ error: "Failed to delete account data." }, { status: 500 });
-    }
-  }
+  try {
+    const resumeObjectKeys = await collectResumeObjectKeys(supabase, user.id);
+    await removeResumeObjects(supabase, resumeObjectKeys);
 
-  // Step 2: Delete applications
-  {
-    const { error } = await supabase.from("applications").delete().eq("user_id", user.id);
-    if (error) {
-      console.error("[account/delete] applications delete failed:", error.message);
-      return NextResponse.json({ error: "Failed to delete account data." }, { status: 500 });
-    }
-  }
+    await recordAuditEvent(supabase, request, {
+      actorUserId: user.id,
+      eventType: "account.deleted",
+      subjectType: "user",
+      subjectId: user.id,
+      metadata: { storageObjectsDeleted: resumeObjectKeys.length },
+    });
 
-  // Step 3: Delete alerts (table is "alerts" in schema)
-  {
-    const { error } = await supabase.from("alerts").delete().eq("user_id", user.id);
-    if (error) {
-      console.error("[account/delete] alerts delete failed:", error.message);
-      return NextResponse.json({ error: "Failed to delete account data." }, { status: 500 });
-    }
-  }
-
-  // Step 4: Delete alert_deliveries
-  {
-    const { error } = await supabase.from("alert_deliveries").delete().eq("user_id", user.id);
-    if (error) {
-      console.error("[account/delete] alert_deliveries delete failed:", error.message);
-      return NextResponse.json({ error: "Failed to delete account data." }, { status: 500 });
-    }
-  }
-
-  // Step 5: Delete notifications
-  {
-    const { error } = await supabase.from("notifications").delete().eq("user_id", user.id);
-    if (error) {
-      console.error("[account/delete] notifications delete failed:", error.message);
-      return NextResponse.json({ error: "Failed to delete account data." }, { status: 500 });
-    }
-  }
-
-  // Step 6: Delete quick_prep_cache (user-owned rows only)
-  {
-    const { error } = await supabase
-      .from("quick_prep_cache")
-      .delete()
-      .not("user_id", "is", null)
-      .eq("user_id", user.id);
-    if (error) {
-      console.error("[account/delete] quick_prep_cache delete failed:", error.message);
-      return NextResponse.json({ error: "Failed to delete account data." }, { status: 500 });
-    }
-  }
-
-  // Step 7: Delete profile_embeddings (via profile FK)
-  {
-    const { error } = await supabase.rpc("delete_profile_embeddings_for_user", {
+    const { data: deleted, error: dbDeleteError } = await supabase.rpc("delete_internal_account", {
       p_user_id: user.id,
     });
-    // RPC may not exist — fall back to subquery-style delete via profiles join
-    if (error) {
-      // Attempt direct delete using a subquery filter
-      const { data: profileRows } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("user_id", user.id);
-      const profileIds = (profileRows ?? []).map((r: { id: string }) => r.id);
-      if (profileIds.length > 0) {
-        const { error: embErr } = await supabase
-          .from("profile_embeddings")
-          .delete()
-          .in("profile_id", profileIds);
-        if (embErr) {
-          console.error("[account/delete] profile_embeddings delete failed:", embErr.message);
-          return NextResponse.json({ error: "Failed to delete account data." }, { status: 500 });
-        }
-      }
-    }
-  }
-
-  // Step 8: Delete profiles
-  {
-    const { error } = await supabase.from("profiles").delete().eq("user_id", user.id);
-    if (error) {
-      console.error("[account/delete] profiles delete failed:", error.message);
+    if (dbDeleteError || deleted !== true) {
+      console.error("[account/delete] delete_internal_account failed:", dbDeleteError?.message);
       return NextResponse.json({ error: "Failed to delete account data." }, { status: 500 });
     }
-  }
 
-  // Step 9: Delete resume_extractions
-  {
-    const { error } = await supabase.from("resume_extractions").delete().eq("user_id", user.id);
-    if (error) {
-      console.error("[account/delete] resume_extractions delete failed:", error.message);
-      return NextResponse.json({ error: "Failed to delete account data." }, { status: 500 });
+    const { error: authDeleteError } = await supabase.auth.admin.deleteUser(user.authId);
+    if (authDeleteError) {
+      console.error("[account/delete] auth.admin.deleteUser failed:", authDeleteError.message);
+      return NextResponse.json({ error: "Failed to delete auth account." }, { status: 500 });
     }
+
+    return NextResponse.json({ deleted: true });
+  } catch (err) {
+    console.error("[account/delete] error:", err);
+    return NextResponse.json({ error: "Failed to delete account." }, { status: 500 });
   }
-
-  // Step 10: Delete the Supabase Auth user (uses service-role client)
-  const { error: authDeleteError } = await supabase.auth.admin.deleteUser(user.authId);
-  if (authDeleteError) {
-    console.error("[account/delete] auth.admin.deleteUser failed:", authDeleteError.message);
-    return NextResponse.json({ error: "Failed to delete auth account." }, { status: 500 });
-  }
-
-  // Step 11: Record audit event (best effort — auth user is gone, DB row may remain briefly)
-  await recordAuditEvent(supabase, request, {
-    actorUserId: user.id,
-    eventType: "account.deleted",
-    subjectType: "user",
-    subjectId: user.id,
-    metadata: {},
-  });
-
-  return NextResponse.json({ deleted: true });
 }
 
 // ── GET /api/account — data export ───────────────────────────────────────────
@@ -157,12 +73,19 @@ export async function GET(request: NextRequest) {
       notificationsResult,
     ] = await Promise.all([
       supabase.from("profiles").select("*").eq("user_id", user.id),
-      supabase.from("resume_extractions").select("*").eq("user_id", user.id),
+      supabase
+        .from("resume_extractions")
+        .select(
+          "id, user_id, raw_delete_after, parsed_at, parsed_profile, confidence, parser_version, created_at",
+        )
+        .eq("user_id", user.id),
       supabase.from("saved_jobs").select("*").eq("user_id", user.id),
       supabase.from("applications").select("*").eq("user_id", user.id),
       supabase
         .from("alerts")
-        .select("id, name, query, minimum_match_score, delivery_channels, active, last_evaluated_at, created_at")
+        .select(
+          "id, name, query, minimum_match_score, delivery_channels, active, last_evaluated_at, created_at",
+        )
         .eq("user_id", user.id),
       supabase
         .from("notifications")
@@ -205,4 +128,80 @@ export async function GET(request: NextRequest) {
     console.error("[account/export] error:", err);
     return NextResponse.json({ error: "Failed to export account data." }, { status: 500 });
   }
+}
+
+async function collectResumeObjectKeys(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<string[]> {
+  const keys = new Set<string>();
+
+  const { data: rows, error } = await supabase
+    .from("resume_extractions")
+    .select("raw_object_key")
+    .eq("user_id", userId);
+  if (error) {
+    throw new Error(`Failed to load resume object keys: ${error.message}`);
+  }
+
+  for (const row of rows ?? []) {
+    const rawKey = (row as { raw_object_key?: unknown }).raw_object_key;
+    if (typeof rawKey === "string") {
+      const key = normaliseResumeObjectKey(rawKey, userId);
+      if (key) keys.add(key);
+    }
+  }
+
+  const listedKeys = await listResumeObjectsForUser(supabase, userId);
+  for (const key of listedKeys) {
+    keys.add(key);
+  }
+
+  return Array.from(keys);
+}
+
+async function listResumeObjectsForUser(
+  supabase: SupabaseClient,
+  userId: string,
+  prefix = userId,
+): Promise<string[]> {
+  const { data, error } = await supabase.storage
+    .from(RESUME_BUCKET)
+    .list(prefix, { limit: 1000, sortBy: { column: "name", order: "asc" } });
+
+  if (error) {
+    throw new Error(`Failed to list resume storage objects: ${error.message}`);
+  }
+
+  const keys: string[] = [];
+  for (const item of data ?? []) {
+    if (!item.name) continue;
+    const key = `${prefix}/${item.name}`;
+    if (item.id === null) {
+      keys.push(...(await listResumeObjectsForUser(supabase, userId, key)));
+    } else {
+      keys.push(key);
+    }
+  }
+  return keys;
+}
+
+async function removeResumeObjects(supabase: SupabaseClient, objectKeys: string[]): Promise<void> {
+  for (let i = 0; i < objectKeys.length; i += STORAGE_REMOVE_BATCH_SIZE) {
+    const batch = objectKeys.slice(i, i + STORAGE_REMOVE_BATCH_SIZE);
+    if (batch.length === 0) continue;
+
+    const { error } = await supabase.storage.from(RESUME_BUCKET).remove(batch);
+    if (error) {
+      throw new Error(`Failed to delete resume storage objects: ${error.message}`);
+    }
+  }
+}
+
+function normaliseResumeObjectKey(rawKey: string, userId: string): string | null {
+  let key = rawKey.trim().replace(/^\/+/, "");
+  if (key.startsWith(`${RESUME_BUCKET}/`)) {
+    key = key.slice(RESUME_BUCKET.length + 1);
+  }
+  return key.startsWith(`${userId}/`) ? key : null;
 }

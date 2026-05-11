@@ -230,19 +230,29 @@ def process_canonical_event(
 
 
 def run_duplicate_detection_loop(stop_event: threading.Event) -> None:
-    """Consume the canonical stream and write jobs_canonical rows."""
+    """Consume the canonical stream using consumer groups and write jobs_canonical rows."""
     from job_globe_workers.db.connection import get_pool
     from job_globe_workers.db.repositories.agent_runs import finish_agent_run, start_agent_run
     from job_globe_workers.db.repositories.audit import record_worker_failure
     from job_globe_workers.db.repositories.taxonomy import load_taxonomy_synonyms
-    from job_globe_workers.event_bus.consumer import read_events
+    from job_globe_workers.event_bus.consumer import (
+        ack_event,
+        ensure_consumer_group,
+        publish_to_dlq,
+        read_group_events,
+        read_pending_events,
+    )
     from job_globe_workers.settings import settings
 
     pool = get_pool()
-    last_id = "0-0"
+    stream = settings.canonical_stream
+    group = settings.redis_consumer_group
+    consumer = settings.redis_consumer_name
     processed = 0
     failed = 0
-    logger.info("dedupe.loop.started")
+    logger.info("dedupe.loop.started", group=group, consumer=consumer)
+
+    ensure_consumer_group(stream, group)
 
     with pool.connection() as conn:
         run_id = start_agent_run(conn, agent_name="duplicate_detection")
@@ -251,19 +261,53 @@ def run_duplicate_detection_loop(stop_event: threading.Event) -> None:
 
     logger.info("dedupe.taxonomy_loaded", categories=list(taxonomy_index.keys()))
 
+    def _handle_event(msg_id: str, payload: dict[str, str]) -> bool:
+        event = _deserialise(payload)
+        ok = process_canonical_event(event, taxonomy_index)
+        return ok
+
     try:
         while not stop_event.is_set():
-            for msg_id, payload in read_events(settings.canonical_stream, last_id):
+            batch_processed = 0
+
+            # 1. Reclaim stale pending messages
+            for msg_id, payload, delivery_count in read_pending_events(
+                stream, group, consumer, min_idle_ms=60_000
+            ):
+                if stop_event.is_set():
+                    break
+                if delivery_count > settings.redis_max_retries:
+                    logger.error("dedupe.dlq", msg_id=msg_id, delivery_count=delivery_count)
+                    publish_to_dlq(stream, msg_id, payload, "max_retries_exceeded")
+                    ack_event(stream, group, msg_id)
+                    failed += 1
+                    continue
+                try:
+                    ok = _handle_event(msg_id, payload)
+                    processed += 1 if ok else 0
+                    failed += 0 if ok else 1
+                    ack_event(stream, group, msg_id)
+                    batch_processed += 1
+                except Exception as exc:  # noqa: BLE001
+                    failed += 1
+                    logger.error("dedupe.pending_event_error", msg_id=msg_id, error=str(exc))
+                    record_worker_failure(
+                        pool,
+                        agent_name="duplicate_detection",
+                        error=exc,
+                        metadata={"messageId": msg_id},
+                    )
+
+            # 2. Read new messages
+            for msg_id, payload in read_group_events(stream, group, consumer):
                 if stop_event.is_set():
                     break
                 try:
-                    event = _deserialise(payload)
-                    ok = process_canonical_event(event, taxonomy_index)
-                    if ok:
-                        processed += 1
-                    else:
-                        failed += 1
-                    last_id = msg_id
+                    ok = _handle_event(msg_id, payload)
+                    processed += 1 if ok else 0
+                    failed += 0 if ok else 1
+                    ack_event(stream, group, msg_id)
+                    batch_processed += 1
                 except Exception as exc:  # noqa: BLE001
                     failed += 1
                     logger.error("dedupe.event_error", msg_id=msg_id, error=str(exc))
@@ -273,6 +317,9 @@ def run_duplicate_detection_loop(stop_event: threading.Event) -> None:
                         error=exc,
                         metadata={"messageId": msg_id},
                     )
+
+            if batch_processed == 0:
+                stop_event.wait(timeout=settings.worker_poll_interval_seconds)
     finally:
         with pool.connection() as conn:
             finish_agent_run(

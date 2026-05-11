@@ -151,7 +151,7 @@ export default function AlertsPage() {
       </div>
 
       {error && (
-        <div style={{
+        <div role="alert" style={{
           background: "var(--color-background-danger)",
           color: "var(--color-text-danger)",
           border: "0.5px solid var(--color-border-danger)",

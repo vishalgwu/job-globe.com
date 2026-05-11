@@ -14,7 +14,7 @@
  * Privacy policy compliance (docs/decisions/privacy-framework.md):
  *   - Raw files are never public. All access is via signed URLs.
  *   - raw_delete_after enforces the 30-day retention window.
- *   - Parsed text is kept in resume_extractions even after raw deletion.
+ *   - Full parsed resume text is not retained after structured parsing.
  */
 
 import crypto from "node:crypto";
@@ -27,6 +27,15 @@ import { createServerSupabaseClient } from "../../../lib/supabase/server";
 
 const RESUME_BUCKET = "resumes";
 const SIGNED_URL_TTL_SECONDS = 300; // 5 minutes
+const SUPPORTED_RESUME_EXTENSIONS = new Set(["pdf", "docx", "txt"]);
+const SUPPORTED_RESUME_MIME_TYPES: Record<string, Set<string>> = {
+  pdf: new Set(["application/pdf", "application/octet-stream"]),
+  docx: new Set([
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/octet-stream",
+  ]),
+  txt: new Set(["text/plain", "application/octet-stream"]),
+};
 
 // ── POST: upload ───────────────────────────────────────────────────────────
 
@@ -49,11 +58,10 @@ export async function POST(request: NextRequest) {
   }
 
   const originalName = file instanceof File ? file.name : "resume";
-  const extension = originalName.split(".").pop() ?? "pdf";
-  const allowedExtensions = ["pdf", "doc", "docx", "txt", "rtf"];
-  if (!allowedExtensions.includes(extension.toLowerCase())) {
+  const extension = (originalName.split(".").pop() ?? "").toLowerCase();
+  if (!isSupportedResumeUpload(extension, file.type)) {
     return NextResponse.json(
-      { error: "Unsupported file type. Upload PDF, DOCX, DOC, TXT, or RTF." },
+      { error: "Unsupported file type. Upload PDF, DOCX, or TXT." },
       { status: 400 },
     );
   }
@@ -63,7 +71,6 @@ export async function POST(request: NextRequest) {
   }
 
   const fileBuffer = Buffer.from(await file.arrayBuffer());
-  const sha256 = crypto.createHash("sha256").update(fileBuffer).digest("hex");
 
   // Path: resumes/{userId}/{uuid}.{ext} — scoped to user, no public listing
   const objectKey = `${user.id}/${crypto.randomUUID()}.${extension}`;
@@ -95,11 +102,12 @@ export async function POST(request: NextRequest) {
         {
           user_id: user.id,
           raw_object_key: objectKey,
-          raw_file_sha256: sha256,
+          raw_file_sha256: null,
           encrypted_at: new Date().toISOString(),
           raw_delete_after: rawDeleteAfter,
           parser_version: "phase-4",
           parsed_text: null,
+          parsed_at: null,
           parsed_profile: {},
           confidence: {},
         },
@@ -146,7 +154,12 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ── GET: signed URL ────────────────────────────────────────────────────────
+// ── GET: signed URL + parse status ─────────────────────────────────────────
+//
+// parseStatus values:
+//   "none"       — no resume on file (no extractions row)
+//   "pending"    — raw file uploaded, parser has not yet run
+//   "done"       — parsed_at is set; parsed_profile is available
 
 export async function GET(request: NextRequest) {
   const user = await resolveRequestUser(request);
@@ -159,24 +172,52 @@ export async function GET(request: NextRequest) {
 
     const { data: row } = await supabase
       .from("resume_extractions")
-      .select("raw_object_key, raw_delete_after, raw_file_sha256, created_at")
+      .select("raw_object_key, raw_delete_after, created_at, parsed_at, parsed_profile, confidence")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (!row || !row.raw_object_key) {
-      return NextResponse.json({ resume: null });
+    if (!row) {
+      return NextResponse.json({ resume: null, parseStatus: "none" });
     }
 
-    const { data: signedData } = await supabase.storage
-      .from(RESUME_BUCKET)
-      .createSignedUrl(row.raw_object_key, SIGNED_URL_TTL_SECONDS);
+    // Determine parse status
+    const parseStatus: "pending" | "done" = row.parsed_at ? "done" : "pending";
+
+    // Only produce a signed URL if a raw file still exists on storage
+    let signedUrl: string | null = null;
+    if (row.raw_object_key) {
+      const { data: signedData } = await supabase.storage
+        .from(RESUME_BUCKET)
+        .createSignedUrl(row.raw_object_key, SIGNED_URL_TTL_SECONDS);
+      signedUrl = signedData?.signedUrl ?? null;
+    }
 
     return NextResponse.json({
       resume: {
-        signedUrl: signedData?.signedUrl ?? null,
+        signedUrl,
         rawDeleteAfter: row.raw_delete_after,
         uploadedAt: row.created_at,
+        hasRawFile: Boolean(row.raw_object_key),
       },
+      parseStatus,
+      parsedAt: row.parsed_at ?? null,
+      // Expose a lightweight parsed summary — not the full profile object.
+      // Full profile data is available via /api/profile.
+      parsedSummary: row.parsed_at
+        ? {
+            hasName: Boolean(
+              row.parsed_profile &&
+                typeof row.parsed_profile === "object" &&
+                !Array.isArray(row.parsed_profile) &&
+                (row.parsed_profile as Record<string, unknown>).name,
+            ),
+            skillCount: Array.isArray(
+              (row.parsed_profile as Record<string, unknown> | null)?.skills,
+            )
+              ? ((row.parsed_profile as Record<string, unknown>).skills as unknown[]).length
+              : 0,
+          }
+        : null,
     });
   } catch (err) {
     console.error("resume GET error", err);
@@ -215,10 +256,16 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Failed to delete resume." }, { status: 500 });
     }
 
-    // Null out the object key — parsed extraction is retained per privacy policy
+    // Null out raw-file metadata. Structured extraction may remain.
     const { error: updateError } = await supabase
       .from("resume_extractions")
-      .update({ raw_object_key: null })
+      .update({
+        raw_object_key: null,
+        raw_file_sha256: null,
+        raw_delete_after: null,
+        parsed_text: null,
+        user_retained: false,
+      })
       .eq("user_id", user.id);
 
     if (updateError) {
@@ -239,4 +286,14 @@ export async function DELETE(request: NextRequest) {
     console.error("resume DELETE error", err);
     return NextResponse.json({ error: "Failed to delete resume." }, { status: 500 });
   }
+}
+
+function isSupportedResumeUpload(extension: string, contentType: string): boolean {
+  if (!SUPPORTED_RESUME_EXTENSIONS.has(extension)) {
+    return false;
+  }
+  if (!contentType) {
+    return true;
+  }
+  return SUPPORTED_RESUME_MIME_TYPES[extension]?.has(contentType) === true;
 }

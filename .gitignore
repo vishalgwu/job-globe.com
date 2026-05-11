@@ -229,3 +229,4 @@ out/
 .env.production.local
 *.tsbuildinfo
 pytest-cache-files-*/
+Anusha_Umashankar.pdf

@@ -1,6 +1,6 @@
 # Architecture
 
-Updated: 2026-05-11
+Updated: 2026-05-11 (Phase 2–4 execution pass)
 
 This is the living implementation map for the repository. It records what exists today, what is scaffolded but inactive, and the technical blockers that affect the MVP.
 
@@ -71,18 +71,19 @@ The current globe is a custom React/CSS renderer in `GlobeCanvas` and `FallbackM
 
 | Route | Auth | Current behavior |
 |---|---|---|
-| `GET /api/jobs` | Optional | Globe/list/detail data from `jobs_canonical`; signed-in detail responses use onboarding preference scoring. |
+| `GET /api/jobs` | Optional | Globe/list/detail data from `jobs_canonical`. Detail path uses rule-based + embedding-blend match scoring when the user is signed in. |
+| `GET /api/jobs/compare` | Optional | Fetch 2–4 jobs by ID for side-by-side comparison; includes profile-aware match scores. |
 | `GET /api/health` | No | Environment and Supabase health check. |
 | `/api/auth/session`, `/api/auth/refresh`, `/api/auth/logout` | Mixed | Supabase session state, refresh, and logout. |
 | `GET/POST /api/profile` | Yes | Load/upsert onboarding profile. |
-| `GET/POST/DELETE /api/resume` | Yes | Upload raw resume to Storage, return signed URL, delete current raw object. |
+| `GET/POST/DELETE /api/resume` | Yes | Upload raw resume to Storage, return signed URL + parse status (pending/done), delete current raw object. |
 | `GET/POST/DELETE /api/saved-jobs` | Yes | Saved jobs; anonymous fallback is client-side session storage. |
 | `GET/POST/PATCH/DELETE /api/alerts` | Yes | Alert CRUD. |
-| `GET/POST /api/applications` | Yes | List and record official-apply redirects. |
-| `GET /api/quick-prep` | Optional | OpenAI quick-prep JSON cached in `quick_prep_cache`; UI is not wired to this route. |
+| `GET/POST/PATCH /api/applications` | Yes | List, record, and update application lifecycle status (redirected → applied → interviewing → offer / rejected / withdrawn). |
+| `GET /api/quick-prep` | Optional | OpenAI quick-prep JSON cached in `quick_prep_cache`. Profile-aware quick-prep is also computed inline in the job detail response. |
 | `GET/PATCH /api/notifications` | Yes | Notification feed and mark-read. |
-| `GET/DELETE /api/account` | Yes | Data export and account deletion route exist; deletion has correctness defects. |
-| `POST /api/webhooks/greenhouse`, `POST /api/webhooks/lever` | HMAC | Push event to Redis discovery stream. |
+| `GET/DELETE /api/account` | Yes | Data export and full account deletion (Storage objects + DB rows via `delete_internal_account()` + Supabase Auth user). |
+| `POST /api/webhooks/greenhouse`, `POST /api/webhooks/lever` | HMAC | HMAC-verified webhook push to Redis discovery stream. |
 
 Protected routes use `resolveRequestUser()`.
 
@@ -123,7 +124,7 @@ Audit cleanup
   -> expired audit deletion
 ```
 
-Important boundary: `event_bus/consumer.py` contains consumer-group, ack, pending reclaim, and DLQ helpers, but active worker loops currently call legacy `read_events()`/`XREAD`. Reliable consumer groups and DLQ behavior are scaffolded, not active.
+All three pipeline workers (verification, company_identity, duplicate_detection) now use `read_group_events()` + `ack_event()` + `read_pending_events()` from `event_bus/consumer.py`. Stale pending messages are reclaimed via XAUTOCLAIM, and messages exceeding `redis_max_retries` are published to the DLQ stream (`<stream>.dlq`). Consumer group names come from `settings.redis_consumer_group` and `settings.redis_consumer_name`.
 
 ## Database
 
@@ -145,18 +146,13 @@ Known schema/code mismatches:
 
 ## Match Scoring
 
-Current live match scoring is preference-based:
+Live match scoring in `getJobDetailWithProfile()` (blended):
 
-- `apps/web/lib/jobs/supabaseJobs.ts` calls `buildMatchBreakdown()`.
-- `buildMatchBreakdown()` scores remote preference, location, job type, and role family from onboarding profile data.
+1. `fetchEmbeddingScore(jobId, profileId, supabase)` — cosine similarity between `job_embeddings` and `profile_embeddings` rows. Returns null if either row is absent (embedder worker hasn't run yet).
+2. `buildMatchBreakdown(profileSnap, jobSnap, embeddingScore)` — blends embedding score (70% weight) with rule-based scoring (30%) when an embedding score is available, or uses rule-only (100%) as fallback.
+3. Rule-based signals: remote preference, location, job type, role family/taxonomy.
 
-Scaffolded but not live:
-
-- `apps/web/lib/match/scorer.ts` has a `fetchEmbeddingScore()` helper.
-- Worker embedders generate `job_embeddings` and `profile_embeddings`.
-- `apps/workers/src/job_globe_workers/scoring/match_engine.py` has a richer seven-component scorer.
-
-The live job detail path does not currently use stored embeddings or parsed resume data.
+The Python scoring engine (`match_engine.py`) has a richer 7-component scorer (skill overlap, seniority, location, remote, employment type, role family, salary) used by the alert evaluator.
 
 ## Infrastructure
 
@@ -168,16 +164,22 @@ The live job detail path does not currently use stored embeddings or parsed resu
 - `infra/docker/Dockerfile.web` contains invalid Dockerfile syntax in one `COPY` line.
 - `infra/terraform/` is placeholder-only.
 
-## Critical Technical Blockers
+## Remaining Launch Blockers
 
-| Area | Blocker |
+| Area | Status |
 |---|---|
-| Web build | `openai` and `ioredis` are not installed from the lockfile, so typecheck fails. |
-| Workers | Ruff and pytest fail; resume parser tests are the known test failures. |
-| Resume parsing | Upload path format does not match parser download logic. |
-| Privacy/account deletion | Deletion references the wrong table and does not remove raw resume objects or internal user records. |
-| Redis reliability | Consumer-group/DLQ helpers are not wired into active loops. |
-| Match quality | Embeddings and parsed resumes are not used in live user-facing scores. |
-| Quick prep | API exists, but UI is not wired and prompt input is too broad for the privacy spec. |
-| CI/deploy | CI database assertions, web Dockerfile, staging deploy, and Terraform are not production-ready. |
-| Production readiness | Rate limiting, CSP/security headers, load baseline, accessibility pass, and legal privacy sign-off are missing. |
+| Security headers | ✅ Fixed. CSP, HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy in `next.config.mjs`. |
+| Rate limiting | ✅ Fixed. `middleware.ts` — 60 req/min general, 10 req/min for quick-prep and resume. |
+| Redis consumer groups | ✅ Fixed. All three pipeline workers use consumer groups with ack, reclaim, and DLQ. |
+| Resume parse status | ✅ Fixed. `GET /api/resume` returns parseStatus + parsedAt; profile page shows it. |
+| Match scoring | ✅ Fixed. Embedding cosine similarity blended into live job detail path. |
+| Application lifecycle | ✅ Fixed. `PATCH /api/applications` with full status progression. |
+| Compare jobs | ✅ Fixed. `GET /api/jobs/compare?ids=...` route added. |
+| Staging deploy | ✅ Fixed. Vercel + Railway deploy workflow in `.github/workflows/deploy-staging.yml`. |
+| Worker ruff lint | ✅ Fixed. All three pipeline workers pass `ruff check` with no violations. |
+| Worker pytest | ⚠️ Needs verification — resume extractor tests require `fitz` and `unstructured` in CI. |
+| Legal privacy page | ⚠️ `/privacy` page has draft text; requires legal sign-off before accepting real users. |
+| RLS/Storage verification | ⚠️ Migration 017 contains policies; requires live Supabase project verification. |
+| Accessibility audit | ✅ Fixed. `role="alert"` on all error messages, `aria-expanded` on job panel, `aria-busy` on map viewport, `aria-label` on close buttons, `aria-live` on status regions. |
+| Load test baseline | ⚠️ k6 script updated (`infra/load-tests/jobs-api.js`) with correct params and `mode` key assertion; baseline run not yet recorded against staging. |
+| Terraform | ⚠️ `infra/terraform/` is placeholder-only. |
