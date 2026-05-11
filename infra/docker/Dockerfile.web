@@ -1,8 +1,56 @@
-FROM node:20-alpine
+# syntax=docker/dockerfile:1
+# ── Production image for the Job Globe Next.js web application ───────────────
+
+# ── Stage 1: deps — install node_modules ─────────────────────────────────────
+FROM node:20-alpine AS deps
 WORKDIR /app
-COPY package.json ./
+
+# Install libc compat for native modules on Alpine
+RUN apk add --no-cache libc6-compat
+
+# Copy workspace manifests so npm ci can resolve all workspaces
+COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/package.json
-RUN npm install --workspaces --include-workspace-root
+COPY packages/ packages/
+
+RUN npm ci
+
+# ── Stage 2: builder — compile Next.js ───────────────────────────────────────
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1
+
+# Copy installed modules from the deps stage
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules 2>/dev/null || true
+
+# Copy the full source tree (needed by the Next.js build)
 COPY . .
+
+# Build only the web workspace
+RUN npm run build --workspace=apps/web
+
+# ── Stage 3: runner — minimal production image ────────────────────────────────
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000
+
+RUN apk add --no-cache libc6-compat \
+    && addgroup --system nodejs \
+    && adduser  --system --ingroup nodejs nextjs
+
+# Copy Next.js standalone output (requires `output: "standalone"` in next.config)
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static     ./apps/web/.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public           ./apps/web/public
+
+USER nextjs
+
 EXPOSE 3000
-CMD ["npm", "run", "dev:web"]
+
+CMD ["node", "apps/web/server.js"]

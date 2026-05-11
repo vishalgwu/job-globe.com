@@ -19,11 +19,14 @@ EXPECTED_FILES = [
     "012_job_time_filter_indexes.sql",
     "013_profiles_preferences.sql",
     "014_resume_extractions_user_unique.sql",
+    "015_alert_deliveries_and_quick_prep.sql",
+    "016_audit_retention.sql",
 ]
 EXPECTED_TABLES = {
     "users", "auth_sessions", "profiles", "resume_extractions", "companies", "locations",
     "jobs_raw", "jobs_canonical", "job_taxonomy", "job_taxonomy_links", "job_embeddings",
     "profile_embeddings", "saved_jobs", "applications", "alerts", "agent_runs", "audit_events",
+    "alert_deliveries", "notifications", "quick_prep_cache", "audit_retention_policies",
 }
 
 
@@ -53,7 +56,16 @@ def main(migrations_dir: str) -> int:
     if "idx_resume_extractions_user_unique" not in sql:
         print("Expected resume_extractions user uniqueness index is missing")
         return 1
-    print("Migration validation passed: 14 files, 17 tables, pgvector, GIN indexes, and resume uniqueness present.")
+    if "alert_deliveries" not in sql:
+        print("Expected alert_deliveries table is missing")
+        return 1
+    if "audit_retention_policies" not in sql:
+        print("Expected audit_retention_policies table is missing")
+        return 1
+    print(
+        "Migration validation passed: 16 files, 21 tables, pgvector, GIN indexes, "
+        "resume uniqueness, alert deliveries, and audit retention present."
+    )
     return 0
 
 

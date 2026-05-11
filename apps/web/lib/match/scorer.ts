@@ -10,6 +10,8 @@
  * Returns a MatchBreakdown that the UI can render immediately.
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import type { MatchBreakdown, MatchSignal } from "@job-globe/shared-types";
 
 // ── Cosine similarity ──────────────────────────────────────────────────────
@@ -158,6 +160,38 @@ export function buildSummary(score: number, strengths: MatchSignal[], gaps: Matc
 
   const topGap = gaps[0]?.label?.toLowerCase() ?? "multiple criteria";
   return `Weak match (${pct}%). Key difference: ${topGap}.`;
+}
+
+// ── Embedding-based score fetcher ─────────────────────────────────────────
+
+/**
+ * Fetches the cosine similarity score between a job embedding and a profile
+ * embedding stored in Supabase. Returns null if either embedding is missing.
+ */
+export async function fetchEmbeddingScore(
+  jobId: string,
+  profileId: string,
+  supabase: SupabaseClient,
+): Promise<number | null> {
+  const [jobResult, profileResult] = await Promise.all([
+    supabase
+      .from("job_embeddings")
+      .select("embedding")
+      .eq("job_id", jobId)
+      .maybeSingle(),
+    supabase
+      .from("profile_embeddings")
+      .select("embedding")
+      .eq("profile_id", profileId)
+      .maybeSingle(),
+  ]);
+
+  const jobEmbedding = jobResult.data?.embedding as number[] | null | undefined;
+  const profileEmbedding = profileResult.data?.embedding as number[] | null | undefined;
+
+  if (!jobEmbedding || !profileEmbedding) return null;
+
+  return cosineSimilarity(jobEmbedding, profileEmbedding);
 }
 
 // ── Full breakdown builder ─────────────────────────────────────────────────

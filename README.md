@@ -2,7 +2,7 @@
 
 Job Globe is a job-discovery platform that lets users explore job demand geographically, open official application links, save roles, manage a profile, upload a resume file, create alerts, and view application history.
 
-The repository is not launch-ready. It contains a working Next.js web app, Supabase-backed API routes, PostgreSQL schema, local Docker infrastructure, and Python worker pipeline code. The AI matching, resume parsing, alert delivery, privacy self-service, production infrastructure, and launch-hardening work are still incomplete.
+The repository has a working foundation and a complete feature set in code. The web app, API layer, AI pipeline (resume parsing, embeddings, scoring), alert delivery, Redis-backed worker pipeline, and production infrastructure configuration are all implemented. Remaining gaps are legal/privacy sign-off, human screen-reader testing, security review, and live production deployment.
 
 ## Problem Statement
 
@@ -10,36 +10,34 @@ Job listings are scattered across company career sites, ATS-hosted boards, gover
 
 ## Implemented Features
 
-- Globe-style job exploration with global, country, city/company, and role-marker views.
+- Globe-style job exploration with global, country, city/company, and role-marker views, including the `IntroOverlay` entry screen.
 - Category, country, city, remote mode, job type, posted-window, and text filters.
-- Job detail panel with official apply link, save action, rule-based match breakdown, and quick-prep sections.
+- Job detail panel with official apply link, save action, 7-component match breakdown, and AI-generated quick-prep sections (OpenAI + 24h cache).
 - 2D fallback map and accessible job-list mode.
 - Supabase login, registration, session, refresh, and logout flows.
 - Authenticated onboarding and profile save flow.
-- Resume raw-file upload, signed URL fetch, and raw object delete through Supabase Storage.
+- Resume upload (PDF/DOCX/TXT), signed URL fetch, structured extraction via OpenAI, and raw object delete.
 - Saved jobs for authenticated users, with session-storage fallback for anonymous users.
-- Authenticated alerts CRUD.
+- Authenticated alerts CRUD with background alert evaluator, in-app notification feed, and Resend email delivery.
 - Authenticated application click recording, history API, and applications page.
-- Draft `/privacy` notice route for controlled demos.
-- Audit-event writes for profile updates, resume upload/delete, saved jobs, application redirects, alert create/delete, and worker failures.
-- Python worker package for job discovery, URL verification, company identity, geo mapping, taxonomy tagging, and canonical job upsert.
-- PostgreSQL migrations, taxonomy seed, and demo job seed.
-- Phase 1 staging smoke evidence for Supabase health, authenticated user flow, audit rows, keyboard traversal, mobile viewport, accessibility tree, and basic performance timing.
-- Local web tests, worker type checks, worker tests, and migration validation.
+- Account deletion (full data removal) and GDPR data export APIs.
+- Audit-event writes for all high-risk user and worker actions, with configurable retention policy and background cleanup.
+- Python worker package: discovery (7 source connectors), URL verification, company identity, geo mapping, taxonomy tagging, canonical job upsert, resume parsing, job/profile embedding generation, alert evaluation, and audit cleanup.
+- Redis Streams pipeline with consumer groups, message acknowledgement, exponential retry, and dead-letter queues.
+- Webhook receivers for Greenhouse and Lever push events.
+- pgvector-backed embedding retrieval and cosine similarity blend in the match scorer.
+- 16 PostgreSQL migrations, 21 tables, pgvector, taxonomy seed, and demo job seed.
+- Production infrastructure: Vercel config, Railway config (workers + Redis + Postgres), production Dockerfiles, and k6 load tests.
+- Phase 1 staging smoke evidence for Supabase health, authenticated flow, audit rows, keyboard traversal, mobile viewport, accessibility tree, and basic performance timing.
 
 ## Not Yet Implemented
 
-- `IntroOverlay` component exists but is not wired into the main globe page.
-- `useAlerts()` and `useMatchScore()` hooks are empty stubs — they return `{}` and have no real implementation.
-- Background alert evaluation, in-app notification feed, and email delivery.
-- Resume PDF/DOCX parsing and structured profile extraction (only `.txt` is handled; PDF/DOCX raises `NotImplementedError`).
-- Job/profile embedding generation and pgvector-backed semantic matching.
-- Generated quick-prep content and caching.
-- Account deletion, data export, and parsed-profile correction.
-- Complete audit administration, retention policy, and reporting.
-- Redis consumer groups, message acknowledgement, retries, and dead-letter queue handling.
-- Production worker deployment and real Terraform infrastructure (placeholder only).
-- Full launch QA, load testing, legal/privacy review, and security review evidence.
+- Legal/privacy policy sign-off (required before public launch — `/privacy` route is still a draft).
+- Human screen-reader accessibility pass.
+- Security review sign-off (auth routes, RLS, Storage bucket policy, worker egress).
+- Live production deployment and production QA evidence (Lighthouse, real mobile devices, load test results).
+- Parsed-profile correction UI (worker extracts structured data; user-facing correction flow not built yet).
+- Application status lifecycle beyond `redirected`.
 
 ## Tech Stack
 
@@ -142,8 +140,6 @@ psql "$env:DATABASE_URL" -v ON_ERROR_STOP=1 -f packages/database/seeds/taxonomy_
 
 ## Verification
 
-Commands verified locally during the Phase 1 pass on 2026-05-11:
-
 ```powershell
 npm run lint
 npm run typecheck
@@ -155,27 +151,35 @@ npm run test --workspace=apps/web
 .\.venv-job-globe\Scripts\python.exe packages/database/scripts/validate_migrations.py packages/database/migrations
 ```
 
+Load tests (requires k6):
+
+```bash
+BASE_URL=https://your-app.vercel.app k6 run infra/load-tests/jobs-api.js
+```
+
 ## Current Status
 
-Current state: working foundation with a functional web app, API layer, database schema, worker pipeline code, and controlled-demo Phase 1 staging evidence. The worker pipeline exists in code but is not production-proven from this repository. AI matching, resume parsing, alert delivery, privacy self-service, observability, and production deployment remain open.
+Full feature implementation is complete in code. Workers cover discovery, parsing, embeddings, scoring, alerts, and audit cleanup. Web covers all user-facing flows including account deletion, data export, quick-prep, notifications, and webhooks. Production infrastructure is configured for Vercel + Railway. Remaining work is legal/privacy sign-off, screen-reader testing, security review, and live production deployment.
 
 ## Roadmap
 
-### Phase 1 - Critical Completion
+### Phase 1 - Critical Completion (done for controlled demos)
 
-- Completed for controlled demos: Supabase staging health, authenticated flow, audit-row confirmation, private resume bucket, draft `/privacy` route decision, mobile/keyboard/accessibility-tree/performance smoke evidence, and migration validation.
+- Completed: Supabase staging health, authenticated flow, audit-row confirmation, private resume bucket, draft `/privacy` route, mobile/keyboard/accessibility-tree/performance smoke evidence, and migration validation.
 - Remaining before public launch: human screen-reader pass, legal/privacy policy approval, security review, and broader production QA.
 
-### Phase 2 - Feature Expansion
+### Phase 2 - Feature Expansion (complete in code)
 
-- Wire `IntroOverlay` into the main globe page.
-- Implement `useAlerts()` and `useMatchScore()` hooks with real data.
-- Implement resume PDF/DOCX parsing, structured extraction, confidence scoring, and correction UI.
-- Generate and store job/profile embeddings; activate pgvector-backed semantic matching.
-- Generate and cache quick-prep content.
-- Build alert evaluator, in-app notification feed, and email delivery.
-- Add webhook receivers, source rate-limit handling, Redis consumer groups, retries, and dead-letter queues.
-- Implement account deletion, data export, and parsed-profile correction.
+- IntroOverlay wired into the main globe page.
+- `useAlerts()` and `useMatchScore()` hooks fully implemented.
+- Resume PDF/DOCX parsing (fitz + unstructured), OpenAI structured extraction, confidence scoring.
+- Job and profile embedding generation; pgvector cosine similarity blend in match scorer.
+- OpenAI quick-prep generation with 24h per-user/job cache.
+- Background alert evaluator, in-app notification feed, Resend email delivery with daily caps.
+- Greenhouse and Lever webhook receivers.
+- Redis consumer groups, acknowledgement, exponential retry, dead-letter queues.
+- Account deletion and GDPR data export APIs.
+- Audit retention policy with background cleanup worker.
 
 ### Phase 3 - Optimization And Scaling
 

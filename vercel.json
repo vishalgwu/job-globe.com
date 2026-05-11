@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "rootDirectory": "apps/web",
+  "buildCommand": "cd ../.. && npm run build --workspace=apps/web",
+  "outputDirectory": "apps/web/.next",
+  "installCommand": "cd ../.. && npm ci",
+  "regions": ["iad1"],
+  "env": {
+    "NODE_ENV": "production"
+  }
+}

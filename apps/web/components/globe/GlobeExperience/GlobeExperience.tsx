@@ -19,6 +19,7 @@ import { FilterBar } from "../../filters/FilterBar/FilterBar";
 import { JobPanel } from "../../job-panel/JobPanel/JobPanel";
 import { FallbackMap } from "../FallbackMap/FallbackMap";
 import { GlobeCanvas } from "../GlobeCanvas/GlobeCanvas";
+import { IntroOverlay } from "../IntroOverlay/IntroOverlay";
 import { ZoomController } from "../ZoomController/ZoomController";
 import { useGlobeStore } from "../../../stores/globeStore";
 import { useJobStore } from "../../../stores/jobStore";
@@ -76,6 +77,8 @@ export function GlobeExperience() {
   const [forceFallback, setForceFallback] = useState(false);
   const [listMode, setListMode] = useState(false);
   const [webglAvailable, setWebglAvailable] = useState(true);
+  const [introVisible, setIntroVisible] = useState(true);
+  const [introMuted, setIntroMuted] = useState(false);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -236,6 +239,14 @@ export function GlobeExperience() {
 
   return (
     <main className="globe-rich">
+      <IntroOverlay
+        isVisible={introVisible}
+        isMuted={introMuted}
+        onEnter={() => setIntroVisible(false)}
+        onPersonalize={() => { setIntroVisible(false); window.location.href = "/onboarding"; }}
+        onDemoCluster={() => setIntroVisible(false)}
+        onMutedChange={setIntroMuted}
+      />
       <a className="skip-link" href="#globe-list-mode">
         Skip to job list
       </a>

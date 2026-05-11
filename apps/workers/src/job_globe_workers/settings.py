@@ -71,12 +71,34 @@ class WorkerSettings(BaseSettings):
     # AI / embeddings
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     embedding_model: str = Field(default="text-embedding-3-small")
+    embedding_dimensions: int = Field(default=1536, alias="EMBEDDING_DIMENSIONS")
+    quick_prep_model: str = Field(default="gpt-4o-mini", alias="QUICK_PREP_MODEL")
+    quick_prep_cache_ttl_hours: int = Field(default=24, alias="QUICK_PREP_CACHE_TTL_HOURS")
     resume_raw_retention_days: int = Field(default=30)
+
+    # Alert delivery
+    resend_api_key: str = Field(default="", alias="RESEND_API_KEY")
+    alert_from_email: str = Field(default="alerts@job-globe.com", alias="ALERT_FROM_EMAIL")
+    alert_daily_max_per_user: int = Field(default=5, alias="ALERT_DAILY_MAX_PER_USER")
+    alert_evaluator_interval_seconds: float = Field(default=300.0)  # 5-minute cadence
+
+    # Webhook security
+    greenhouse_webhook_secret: str = Field(default="", alias="GREENHOUSE_WEBHOOK_SECRET")
+    lever_webhook_secret: str = Field(default="", alias="LEVER_WEBHOOK_SECRET")
 
     # Worker concurrency
     worker_poll_interval_seconds: float = Field(default=5.0)
     db_pool_min_size: int = Field(default=2)
     db_pool_max_size: int = Field(default=10)
+
+    # Redis consumer group settings
+    redis_consumer_group: str = Field(default="job-globe-workers", alias="REDIS_CONSUMER_GROUP")
+    redis_consumer_name: str = Field(default="worker-0", alias="REDIS_CONSUMER_NAME")
+    redis_max_retries: int = Field(default=3, alias="REDIS_MAX_RETRIES")
+    redis_dlq_stream_suffix: str = Field(default=".dlq", alias="REDIS_DLQ_STREAM_SUFFIX")
+
+    # Audit retention
+    audit_cleanup_interval_hours: int = Field(default=24, alias="AUDIT_CLEANUP_INTERVAL_HOURS")
 
     @property
     def greenhouse_board_token_list(self) -> list[str]:

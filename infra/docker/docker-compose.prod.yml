@@ -1,0 +1,77 @@
+# Production-like Docker Compose
+# Use for local production smoke-testing. Not intended as actual production infra
+# (Vercel hosts web, Railway hosts workers + Redis + Postgres in production).
+#
+# Usage:
+#   cp .env.example .env   # fill in real values
+#   docker compose -f infra/docker/docker-compose.prod.yml up --build
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-job_globe}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-job_globe}
+      POSTGRES_DB: ${POSTGRES_DB:-job_globe}
+    volumes:
+      - job_globe_postgres_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-job_globe} -d ${POSTGRES_DB:-job_globe}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Postgres is intentionally not exposed on the host in prod-like mode.
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - job_globe_redis_prod:/data
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.web
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-job_globe}:${POSTGRES_PASSWORD:-job_globe}@postgres:5432/${POSTGRES_DB:-job_globe}
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  workers:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.workers
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-job_globe}:${POSTGRES_PASSWORD:-job_globe}@postgres:5432/${POSTGRES_DB:-job_globe}
+      REDIS_URL: redis://redis:6379/0
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  job_globe_postgres_prod:
+  job_globe_redis_prod:

@@ -1,6 +1,42 @@
-FROM python:3.11-slim
+# syntax=docker/dockerfile:1
+# ── Production image for the Job Globe Python worker plane ──────────────────
+FROM python:3.11-slim AS base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# System dependencies required by psycopg (libpq) and some ML libs (gcc)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libpq-dev \
+        gcc \
+        build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
+
+# ── Install Python dependencies ──────────────────────────────────────────────
+# Copy only what pip needs so the layer is cached until deps change.
 COPY apps/workers/pyproject.toml apps/workers/pyproject.toml
+COPY apps/workers/requirements.txt apps/workers/requirements.txt
+
+# Install base (production) deps from requirements.txt first for layer caching,
+# then install the package itself in editable mode so the src/ layout is found.
+RUN pip install --no-cache-dir -r apps/workers/requirements.txt
+
+# ── Copy application source ───────────────────────────────────────────────────
 COPY apps/workers/src apps/workers/src
-RUN pip install --no-cache-dir -e apps/workers
-CMD ["python", "-m", "job_globe_workers.runtime"]
+
+# Install the package so `python -m job_globe_workers` resolves correctly
+RUN pip install --no-cache-dir --no-deps -e apps/workers
+
+# Copy shared packages (shared-types etc.) in case workers import from them
+COPY packages/ /packages/
+
+# ── Runtime ──────────────────────────────────────────────────────────────────
+# Non-root user for security
+RUN addgroup --system workers && adduser --system --ingroup workers workers
+USER workers
+
+CMD ["python", "-m", "job_globe_workers"]
