@@ -1,193 +1,159 @@
 # Developer Handoff
 
-This is the concise module map for developers joining the project. For deeper status and gap detail, see `project-status.md` and `project-gap-analysis.md`.
+Updated: 2026-05-11
 
-## Current Architecture
+This is the concise handoff for engineers joining the MVP. For product scope and gap detail, read `project-status.md` and `project-gap-analysis.md` first.
+
+## Current State
+
+The repo has meaningful MVP implementation, but it is not green:
+
+- Web tests pass.
+- Migration validation passes.
+- Worker mypy passes.
+- Web typecheck fails because web dependencies are not in the lockfile/installed tree.
+- Worker ruff and pytest currently fail.
+- CI and Docker web build config are stale/broken.
+
+Treat Phase 1 as stabilization before feature expansion.
+
+## Module Map
 
 ```text
 apps/web
-  Next.js pages, client components, API routes, Zustand stores, Supabase helpers
+  Next.js App Router pages, client components, API routes, Zustand stores,
+  Supabase helpers, job filtering, rule-based match scoring.
 
 apps/workers/src/job_globe_workers
-  Python discovery, verification, company identity, geo, taxonomy, canonicalisation
+  Python worker plane: discovery connectors, URL verification, company identity,
+  geo resolution, taxonomy tagging, canonical upsert, resume parser,
+  job/profile embedders, alert evaluator, audit cleanup.
 
 packages/database
-  PostgreSQL migrations, seeds, migration validation/application scripts
+  PostgreSQL migrations (16 files, 21 tables), seeds, validation/application scripts.
 
 packages/shared-types
-  TypeScript contracts and partial Python contracts
+  TypeScript contracts plus partial Python placeholders.
 
 infra
-  Docker local environment plus placeholder Terraform/deploy assets
+  Docker Compose, Dockerfiles, Railway config, Vercel config, k6 load tests,
+  deploy/migration helper scripts.
 ```
 
-Current data flow:
+## Environment Variables
 
-```text
-source APIs -> worker connectors -> Redis Streams -> worker enrichment -> PostgreSQL
-PostgreSQL/Supabase -> Next.js route handlers -> globe/profile UI
-Supabase Auth/Storage -> protected user and resume workflows
-```
+Minimum variables for full local/staging behavior:
 
-## Completed Features
+| Variable | Used by | Notes |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | web, workers resume parser | Required for Supabase project and Storage download. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | web | Public browser/SSR auth key. |
+| `SUPABASE_SERVICE_ROLE_KEY` | web, workers resume parser | Server-only; needed for admin DB/storage/auth actions. |
+| `DATABASE_URL` | workers, migrations | Direct Postgres connection string. |
+| `REDIS_URL` | web webhooks, workers | Redis stream publishing/consuming. |
+| `OPENAI_API_KEY` | web, workers | Quick-prep, resume extraction, embeddings. |
+| `RESEND_API_KEY` | workers | Alert email delivery; not verified. |
+| `ALERT_FROM_EMAIL` | workers | Resend sender address. |
+| `GREENHOUSE_WEBHOOK_SECRET` | web | HMAC key for Greenhouse webhook. |
+| `LEVER_WEBHOOK_SECRET` | web | HMAC key for Lever webhook. |
+| `ADZUNA_APP_ID` / `ADZUNA_APP_KEY` | workers | Adzuna connector. |
+| `USAJOBS_API_KEY` / `USAJOBS_USER_AGENT` | workers | USAJOBS connector. |
+| `GREENHOUSE_BOARD_TOKENS` | workers | Greenhouse polling connector. |
+| `LEVER_COMPANY_SLUGS` | workers | Lever polling connector. |
+| `WORKABLE_API_TOKEN` / `WORKABLE_COMPANY_SLUGS` | workers | Workable connector. |
+| `SMARTRECRUITERS_COMPANY_IDS` | workers | SmartRecruiters connector; missing from root `.env.example`. |
+| `REDIS_STREAM_VERIFICATION` / `REDIS_STREAM_CANONICAL` | workers | Have defaults in code; missing from root `.env.example`. |
 
-- Main globe experience at `apps/web/app/(globe)/page.tsx`.
-- Filter bar, zoom controls, CSS/React globe view, fallback map, accessible list mode, and job panel.
-- Login, register, onboarding, profile, saved jobs, applications, and alerts pages.
-- Draft privacy notice at `/privacy`.
-- Jobs, profile, resume, saved jobs, alerts, applications, health, and auth API routes.
-- Supabase auth resolution into internal `users` rows.
-- Resume raw upload, signed URL read, and raw object delete.
-- Apply CTA records authenticated redirects before opening the official apply URL.
-- Selected audit-event writes exist for high-risk user actions and worker failures.
-- Active worker package with discovery, verification, company identity, geo mapping, taxonomy tagging, canonical job upsert, Redis helpers, and DB repositories.
-- Seven source connector classes: Greenhouse, Lever, Adzuna, USAJOBS, EURES, Workable, and SmartRecruiters.
-- 14 database migrations, 17 application tables, pgvector, taxonomy seed, demo job seed, and resume one-row-per-user uniqueness.
-- Local web tests, worker mypy, worker pytest, and migration validation.
-- Phase 1 controlled-demo evidence for staging Supabase health, authenticated flow, audit rows, mobile screenshots, keyboard traversal, accessibility tree, and basic performance timing.
+## Important Entry Points
 
-## Frontend
+### Web
 
-Purpose: user-facing job discovery, onboarding, profile management, saved jobs, alerts, and application history.
+| Area | Path |
+|---|---|
+| Main globe page | `apps/web/app/(globe)/page.tsx` |
+| Globe orchestration | `apps/web/components/globe/GlobeExperience/GlobeExperience.tsx` |
+| Custom globe renderer | `apps/web/components/globe/GlobeCanvas/GlobeCanvas.tsx` |
+| 2D fallback | `apps/web/components/globe/FallbackMap/FallbackMap.tsx` |
+| Job panel | `apps/web/components/job-panel/JobPanel/JobPanel.tsx` |
+| Static quick prep UI | `apps/web/components/job-panel/QuickPrepToolkit/QuickPrepToolkit.tsx` |
+| Apply CTA | `apps/web/components/job-panel/ApplyCTA/ApplyCTA.tsx` |
+| Onboarding | `apps/web/components/onboarding/OnboardingFlow/OnboardingFlow.tsx` |
+| Resume upload control | `apps/web/components/onboarding/ResumeUpload/ResumeUpload.tsx` |
+| Job data adapter | `apps/web/lib/jobs/supabaseJobs.ts` |
+| Web match scorer | `apps/web/lib/match/scorer.ts` |
+| Auth helper | `apps/web/lib/supabase/auth.ts` |
 
-Key files:
+### API Routes
 
-- `apps/web/components/globe/GlobeExperience/GlobeExperience.tsx`
-- `apps/web/components/globe/GlobeCanvas/GlobeCanvas.tsx`
-- `apps/web/components/globe/FallbackMap/FallbackMap.tsx`
-- `apps/web/components/filters/FilterBar/FilterBar.tsx`
-- `apps/web/components/job-panel/*`
-- `apps/web/components/onboarding/*`
-- `apps/web/stores/*`
-- `apps/web/__tests__/*`
+| Route | Notes |
+|---|---|
+| `/api/jobs` | Globe/list/detail data. Detail uses onboarding preference match only. |
+| `/api/profile` | Authenticated profile GET/POST. |
+| `/api/resume` | Upload/view/delete raw resume object. |
+| `/api/saved-jobs` | Authenticated saved jobs. |
+| `/api/applications` | Redirect application history. |
+| `/api/alerts` | Alert CRUD. |
+| `/api/notifications` | In-app notification feed. |
+| `/api/quick-prep` | OpenAI quick-prep JSON; not wired to UI. |
+| `/api/account` | Export/delete; deletion currently broken and privacy-critical. |
+| `/api/webhooks/greenhouse` and `/api/webhooks/lever` | HMAC-verified Redis publishers. |
 
-In progress or missing:
+### Workers
 
-- `IntroOverlay` exists but is not wired into the active globe page.
-- `useAlerts()` and `useMatchScore()` are stubs.
-- Launch accessibility/performance evidence is not recorded.
+| Module | Entry function | Current purpose |
+|---|---|---|
+| `agents/discovery/runner.py` | `run_discovery_loop` | Poll configured external sources and publish raw jobs. |
+| `agents/verification/worker.py` | `run_verification_loop` | Check URL liveness, write `jobs_raw`, forward verified events. |
+| `agents/company_identity/worker.py` | `run_company_identity_loop` | Resolve/upsert companies and forward canonical events. |
+| `agents/duplicate_detection/detector.py` | `run_duplicate_detection_loop` | Resolve location, classify taxonomy, upsert `jobs_canonical`. |
+| `agents/resume_parser/worker.py` | `run_resume_parser_loop` | Poll and parse uploaded resumes; currently blocked by key mismatch/tests. |
+| `agents/embeddings/job_embedder.py` | `run_job_embedder_loop` | Generate job embeddings. |
+| `agents/embeddings/profile_embedder.py` | `run_profile_embedder_loop` | Generate profile embeddings. |
+| `agents/alert_evaluator/evaluator.py` | `run_alert_evaluator_loop` | Evaluate alerts and create notifications/deliveries. |
+| `agents/audit_cleanup/worker.py` | `run_audit_cleanup_loop` | Apply audit retention policies. |
+| `observability/health.py` | `log_health_loop` | Periodic health logging. |
 
-## API
+## Do Not Overclaim
 
-Purpose: backend-for-frontend route handlers around Supabase and shared job/profile logic.
+These items are present but not fully active:
 
-Key files:
+- Consumer-group Redis helpers exist, but active loops use legacy `read_events()`.
+- Embedding tables/workers exist, but live web match scoring does not fetch embeddings.
+- Quick-prep API exists, but job panel UI still renders static fields.
+- Alert email sender exists, but UI creates in-app alerts and email delivery is not verified.
+- Account export/delete routes exist, but deletion is broken.
+- Globe.GL/deck.gl dependencies exist, but the active renderer is custom React/CSS.
 
-- `apps/web/app/api/jobs/route.ts`
-- `apps/web/app/api/health/route.ts`
-- `apps/web/app/api/auth/*/route.ts`
-- `apps/web/app/api/profile/route.ts`
-- `apps/web/app/api/resume/route.ts`
-- `apps/web/app/api/saved-jobs/route.ts`
-- `apps/web/app/api/alerts/route.ts`
-- `apps/web/app/api/applications/route.ts`
-- `apps/web/lib/supabase/*`
-- `apps/web/lib/jobs/*`
-- `apps/web/lib/match/scorer.ts`
+## P0 Fix List
 
-In progress or missing:
+1. Sync web package lockfile/install so `openai` and `ioredis` resolve.
+2. Update `.github/workflows/ci.yml` database assertions to current 16 migrations / 21 tables.
+3. Fix `infra/docker/Dockerfile.web` invalid `COPY` line.
+4. Fix resume parser Storage key handling and file-type support mismatch.
+5. Repair resume parser tests and ruff failures.
+6. Fix `/api/account` deletion correctness.
+7. Complete legal/privacy review of the draft `/privacy` route.
 
-- No delete account, export data, or parsed-profile correction APIs.
-- Alert CRUD exists, but no background alert evaluator/delivery worker.
-- Application status lifecycle beyond `redirected` is not implemented.
-- Audit administration, retention, and complete event coverage are not implemented.
+## Running Checks
 
-## Workers
-
-Purpose: discover, verify, enrich, and canonicalize external job data.
-
-Key files:
-
-- `apps/workers/src/job_globe_workers/main.py`
-- `apps/workers/src/job_globe_workers/settings.py`
-- `apps/workers/src/job_globe_workers/agents/discovery/*`
-- `apps/workers/src/job_globe_workers/agents/verification/*`
-- `apps/workers/src/job_globe_workers/agents/company_identity/*`
-- `apps/workers/src/job_globe_workers/agents/geo_mapping/geocoder.py`
-- `apps/workers/src/job_globe_workers/agents/categorisation/tagger.py`
-- `apps/workers/src/job_globe_workers/agents/duplicate_detection/detector.py`
-- `apps/workers/src/job_globe_workers/db/repositories/*`
-
-In progress or missing:
-
-- No dedicated ranking worker.
-- No resume parsing worker beyond `.txt` extraction helper.
-- No embedding generation worker.
-- No alert evaluation/delivery worker.
-- No webhook receiver, dead-letter queue, consumer group acking, or explicit rate-limit bucket implementation.
-- Earlier top-level worker placeholder folders were removed; keep new worker code under `apps/workers/src/job_globe_workers`.
-
-## Database
-
-Purpose: canonical data model for users, jobs, profile data, worker state, and planned AI/compliance features.
-
-Key files:
-
-- `packages/database/migrations/*.sql`
-- `packages/database/seeds/taxonomy_reference.sql`
-- `packages/database/seeds/demo_jobs.sql`
-- `packages/database/scripts/validate_migrations.py`
-- `packages/database/scripts/apply_migrations.py`
-
-In progress or missing:
-
-- Embedding tables exist, but no active generation pipeline writes them.
-- Audit table exists and selected Phase 1 events are logged, but retention/reporting coverage is incomplete.
-- Alert table exists, but no delivery history table exists.
-- No production backup/restore runbook in this repo.
-
-## Shared Packages And Config
-
-Purpose: shared contracts and environment examples.
-
-Key files:
-
-- `packages/shared-types/typescript/*.ts`
-- `packages/shared-types/python/*.py`
-- `packages/config/environments/*.env.example`
-- `.env.example`
-
-In progress or missing:
-
-- Python shared `profile.py` and `match.py` are placeholders.
-- Config package is documentation/templates only, not a runtime library.
-
-## Remaining Work
-
-- Phase 1 controlled-demo gate is complete; remaining launch work is legal/privacy approval, human screen-reader testing, security review, and broader production QA.
-- Phase 2: resume parsing, profile correction UI, embeddings, semantic matching, generated quick prep, alert delivery, webhooks, Redis consumer groups/retries/dead letters.
-- Phase 3: production worker deployment, real infrastructure, observability, runbooks, load tests, replay tests, backup/restore, rollback, and security review evidence.
-
-## Current Workflow
-
-Install from the project root:
+Current known results are mixed.
 
 ```powershell
-npm ci
-
-python -m venv .venv-job-globe
-.\.venv-job-globe\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e "apps/workers[dev]"
-```
-
-Run web only:
-
-```powershell
-npm run dev:web
-```
-
-Run local services:
-
-```powershell
-npm run dev
-```
-
-Run current local checks:
-
-```powershell
+# Passing as of 2026-05-11
 npm run test --workspace=apps/web
 .\.venv-job-globe\Scripts\python.exe -m mypy apps/workers/src
-.\.venv-job-globe\Scripts\python.exe -m pytest apps/workers/tests
 .\.venv-job-globe\Scripts\python.exe packages/database/scripts/validate_migrations.py packages/database/migrations
+
+# Currently failing as of 2026-05-11
+npm run typecheck
+.\.venv-job-globe\Scripts\python.exe -m ruff check apps/workers
+.\.venv-job-globe\Scripts\python.exe -m pytest apps/workers/tests
 ```
+
+## Deploy Notes
+
+- Vercel config exists but production deployment has not been verified in this audit.
+- Railway worker config exists but worker deployment has not been verified in this audit.
+- `deploy-staging.yml` is a placeholder.
+- `infra/terraform/` is placeholder-only.
+- Do not treat Docker web image as buildable until `Dockerfile.web` is fixed.

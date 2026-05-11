@@ -14,8 +14,10 @@ The plan needs relational integrity, GIN full-text indexes, JSONB metadata, and 
 
 ## Current Implementation Notes
 
-The repo has 13 idempotent migrations. They create the expected app tables, enable pgvector, and include GIN/full-text/vector indexes. The embedding tables exist, but the embedding generation pipeline is not active yet.
+The repo has 16 idempotent migrations and 21 application tables. The migration validation script currently passes and confirms pgvector, GIN indexes, resume uniqueness, alert deliveries, notifications, quick-prep cache, and audit retention policies.
+
+Embedding tables exist and worker modules generate job/profile embeddings, but the live web match-scoring path does not yet read those embeddings. The database is ready for semantic matching; the product integration is still in progress.
 
 ## Consequences
 
-Local development uses `pgvector/pgvector:pg15`. Migrations must stay ordered, idempotent, and validated by CI.
+Local development uses `pgvector/pgvector:pg15`. Migrations must stay ordered, idempotent, and validated by CI. The CI workflow must be updated to assert the current 16 migration files and 21 tables.

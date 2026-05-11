@@ -2,6 +2,8 @@
 
 k6 load tests for the Job Globe API.
 
+Audit note as of 2026-05-11: the script exists, but no current staging or production baseline result is recorded in the repository. Do not claim load-test readiness until a run artifact is captured.
+
 ## Install k6
 
 **macOS**

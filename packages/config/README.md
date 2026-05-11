@@ -14,6 +14,12 @@ Files:
 - `environments/staging.env.example`
 - `environments/production.env.example`
 
+Audit note as of 2026-05-11:
+
+- Root `.env.example` is close but not complete for all worker settings. It should add `SMARTRECRUITERS_COMPANY_IDS`, `REDIS_STREAM_VERIFICATION`, and `REDIS_STREAM_CANONICAL`.
+- `TRANSACTIONAL_EMAIL_API_KEY` appears to be legacy/unused in current worker settings; Resend uses `RESEND_API_KEY`.
+- Keep root `.env.example`, the templates in this package, and `apps/workers/src/job_globe_workers/settings.py` synchronized whenever environment keys change.
+
 Related documentation:
 
 - `../../.env.example`
