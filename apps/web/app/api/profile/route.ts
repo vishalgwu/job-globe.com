@@ -17,6 +17,7 @@ import type {
   TimeToStart,
 } from "@job-globe/shared-types";
 
+import { recordAuditEvent } from "../../../lib/audit/events";
 import { resolveRequestUser } from "../../../lib/supabase/auth";
 import { createServerSupabaseClient } from "../../../lib/supabase/server";
 
@@ -176,6 +177,21 @@ export async function POST(request: NextRequest) {
       savedAt: row.updated_at,
     };
 
+    await recordAuditEvent(supabase, request, {
+      actorUserId: user.id,
+      eventType: "profile.updated",
+      subjectType: "profile",
+      subjectId: row.id,
+      metadata: {
+        companySizePreference: answers.companySizePreference,
+        jobTypeCount: answers.jobTypes.length,
+        remotePreference: answers.remotePreference,
+        resumeConsentAccepted: answers.resumeConsentAccepted,
+        targetLocationCount: answers.targetLocations.length,
+        timeToStart: answers.timeToStart,
+      },
+    });
+
     const response: ProfileSaveResponse = { ok: true, mode: "authenticated", profile };
     return NextResponse.json(response, { status: 200 });
   } catch (err) {
@@ -202,9 +218,7 @@ function dbRowToAnswers(row: Record<string, unknown>): OnboardingAnswers {
     jobTypes: Array.isArray(prefs.jobTypes)
       ? (prefs.jobTypes as OnboardingAnswers["jobTypes"])
       : [],
-    salarySensitivity: salarySensitivities.includes(
-      salaryExp.sensitivity as SalarySensitivity,
-    )
+    salarySensitivity: salarySensitivities.includes(salaryExp.sensitivity as SalarySensitivity)
       ? (salaryExp.sensitivity as SalarySensitivity)
       : null,
     companySizePreference: companySizePreferences.includes(

@@ -233,6 +233,7 @@ def run_duplicate_detection_loop(stop_event: threading.Event) -> None:
     """Consume the canonical stream and write jobs_canonical rows."""
     from job_globe_workers.db.connection import get_pool
     from job_globe_workers.db.repositories.agent_runs import finish_agent_run, start_agent_run
+    from job_globe_workers.db.repositories.audit import record_worker_failure
     from job_globe_workers.db.repositories.taxonomy import load_taxonomy_synonyms
     from job_globe_workers.event_bus.consumer import read_events
     from job_globe_workers.settings import settings
@@ -266,6 +267,12 @@ def run_duplicate_detection_loop(stop_event: threading.Event) -> None:
                 except Exception as exc:  # noqa: BLE001
                     failed += 1
                     logger.error("dedupe.event_error", msg_id=msg_id, error=str(exc))
+                    record_worker_failure(
+                        pool,
+                        agent_name="duplicate_detection",
+                        error=exc,
+                        metadata={"messageId": msg_id},
+                    )
     finally:
         with pool.connection() as conn:
             finish_agent_run(

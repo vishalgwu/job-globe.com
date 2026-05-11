@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
+import { recordAuditEvent } from "@/lib/audit/events";
 import { resolveRequestUser } from "@/lib/supabase/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -19,7 +20,9 @@ export async function GET(request: NextRequest) {
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
       .from("alerts")
-      .select("id, name, query, minimum_match_score, delivery_channels, active, last_evaluated_at, created_at")
+      .select(
+        "id, name, query, minimum_match_score, delivery_channels, active, last_evaluated_at, created_at",
+      )
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
@@ -64,23 +67,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "name must be 120 characters or fewer." }, { status: 400 });
   }
 
-  const queryObj = (query && typeof query === "object" && !Array.isArray(query))
-    ? (query as Record<string, unknown>)
-    : {};
+  const queryObj =
+    query && typeof query === "object" && !Array.isArray(query)
+      ? (query as Record<string, unknown>)
+      : {};
 
   const minScore =
-    typeof minimum_match_score === "number" && minimum_match_score >= 0 && minimum_match_score <= 100
+    typeof minimum_match_score === "number" &&
+    minimum_match_score >= 0 &&
+    minimum_match_score <= 100
       ? Math.round(minimum_match_score)
       : 70;
 
   const channels: string[] =
-    Array.isArray(delivery_channels) &&
-    delivery_channels.every((c) => typeof c === "string")
+    Array.isArray(delivery_channels) && delivery_channels.every((c) => typeof c === "string")
       ? (delivery_channels as string[]).filter((c) => ["email", "in_app"].includes(c))
       : ["in_app"];
 
   if (channels.length === 0) {
-    return NextResponse.json({ error: "At least one delivery channel is required." }, { status: 400 });
+    return NextResponse.json(
+      { error: "At least one delivery channel is required." },
+      { status: 400 },
+    );
   }
 
   try {
@@ -118,6 +126,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to create alert." }, { status: 500 });
     }
 
+    await recordAuditEvent(supabase, request, {
+      actorUserId: user.id,
+      eventType: "alert.created",
+      subjectType: "alert",
+      subjectId: data.id,
+      metadata: {
+        deliveryChannels: channels,
+        minimumMatchScore: minScore,
+        queryKeys: Object.keys(queryObj),
+      },
+    });
+
     return NextResponse.json({ ok: true, alert: data }, { status: 201 });
   } catch (err) {
     console.error("[alerts] POST error:", err);
@@ -140,16 +160,20 @@ export async function DELETE(request: NextRequest) {
 
   try {
     const supabase = createServerSupabaseClient();
-    const { error } = await supabase
-      .from("alerts")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", user.id); // Scoped to the requesting user — prevents deleting others' alerts
+    const { error } = await supabase.from("alerts").delete().eq("id", id).eq("user_id", user.id); // Scoped to the requesting user — prevents deleting others' alerts
 
     if (error) {
       console.error("[alerts] DELETE failed:", error.message);
       return NextResponse.json({ error: "Failed to delete alert." }, { status: 500 });
     }
+
+    await recordAuditEvent(supabase, request, {
+      actorUserId: user.id,
+      eventType: "alert.deleted",
+      subjectType: "alert",
+      subjectId: id,
+      metadata: {},
+    });
 
     return NextResponse.json({ ok: true });
   } catch (err) {

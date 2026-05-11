@@ -1,6 +1,6 @@
 # Project Status
 
-Updated: 2026-05-10
+Updated: 2026-05-11
 
 Source of truth: the codebase, SQL migrations, tests, and local configuration in this repository. The reference DOCX files in `docs/whole_project` describe the planned product, but this status reflects only what is implemented in code.
 
@@ -9,7 +9,7 @@ Source of truth: the codebase, SQL migrations, tests, and local configuration in
 Job Globe is currently a monorepo with:
 
 - `apps/web`: Next.js App Router frontend and backend-for-frontend route handlers.
-- `apps/workers`: Python worker package plus tests and legacy placeholder folders.
+- `apps/workers`: Python worker package plus tests.
 - `packages/database`: PostgreSQL migrations, seeds, and migration scripts.
 - `packages/shared-types`: TypeScript contracts and partial Python contracts.
 - `packages/config`: environment templates only.
@@ -25,7 +25,7 @@ Supabase Auth/Storage -> protected user, profile, resume, saved-job, alert, and 
 
 ## Current State
 
-The repository has a working foundation, web experience, API layer, schema, and worker pipeline code. The worker pipeline is implemented in code and covered by tests, but production deployment and live-run evidence are not captured in this repository. Planned AI matching, resume parsing, alert delivery, privacy self-service, audit logging, and production hardening are incomplete.
+The repository has a working foundation, web experience, API layer, schema, and worker pipeline code. The worker pipeline is implemented in code and covered by tests, but production deployment and live-run evidence are not captured in this repository. Planned AI matching, resume parsing, alert delivery, privacy self-service, audit administration, and production hardening are incomplete.
 
 ## Completed
 
@@ -40,8 +40,11 @@ The repository has a working foundation, web experience, API layer, schema, and 
 | Resume storage   | Authenticated users can upload a raw resume file to Supabase Storage, fetch a signed URL, and delete the raw object key.                                                                                                                        |
 | Saved jobs       | Authenticated saved jobs persist through the API; anonymous saves use session storage.                                                                                                                                                          |
 | Alerts CRUD      | Alerts can be created, listed, paused/resumed, and deleted.                                                                                                                                                                                     |
-| Application API  | Application redirect records can be created and listed by API.                                                                                                                                                                                  |
+| Applications     | Application redirects are recorded through the Apply CTA and can be listed by API/page.                                                                                                                                                         |
+| Privacy target   | A draft `/privacy` route exists so resume consent no longer points to a missing route.                                                                                                                                                          |
+| Audit events     | Selected audit writes exist for profile updates, resume upload/delete, saved jobs, application redirects, alert create/delete, and worker failures.                                                                                             |
 | Workers          | Active package under `apps/workers/src/job_globe_workers` includes discovery, source connectors, verification, company identity, geo mapping, taxonomy tagging, duplicate/canonical upsert, Redis helpers, DB repositories, and health logging. |
+| Worker cleanup   | Earlier top-level worker placeholder folders were removed; active worker code now lives under `apps/workers/src/job_globe_workers`.                                                                                                             |
 | Database         | 13 migrations define the expected 17 application tables plus indexes, pgvector support, taxonomy seeds, and demo job seeds.                                                                                                                     |
 | CI coverage      | GitHub Actions defines web, worker, and database checks.                                                                                                                                                                                        |
 
@@ -54,8 +57,8 @@ The repository has a working foundation, web experience, API layer, schema, and 
 | Matching           | Rule-based match scoring and UI breakdown exist; optional embedding-score blending is supported by pure functions. | Job/profile embedding generation and pgvector retrieval are not active. The planned 7-component scorer is not implemented.                                                                                                |
 | Resume             | Upload/storage/delete routes exist.                                                                                | Worker resume extraction only reads `.txt`; PDF/DOCX parsing, profile normalisation, confidence review UI, and automated raw-file deletion job are missing.                                                               |
 | Alerts             | Alert CRUD and active-alert cap exist.                                                                             | Background alert evaluation, email delivery, digest bundling, and in-app notification feed are missing.                                                                                                                   |
-| Applications       | API and page exist.                                                                                                | The current Apply button opens the external URL directly and does not call `POST /api/applications`, so clicks are not recorded from the main job panel.                                                                  |
-| Privacy/compliance | Resume consent copy exists in upload UI; schema has audit and resume retention fields.                             | `/privacy` route linked from the UI is missing; delete/export/correction flows and audit-event writes are not implemented.                                                                                                |
+| Applications       | API, page, and Apply CTA recording exist.                                                                          | Application status lifecycle beyond `redirected` is not implemented.                                                                                                                                                      |
+| Privacy/compliance | Resume consent copy, draft `/privacy` route, selected audit writes, and resume retention fields exist.             | Delete/export/correction flows, audit administration, audit retention policy, and legal/privacy sign-off are not implemented.                                                                                             |
 | Infrastructure     | Docker Compose, Dockerfiles, CI, and Vercel handoff files exist.                                                   | Terraform is placeholder-only; staging deploy workflow is a placeholder; production worker deployment is not defined.                                                                                                     |
 
 ## Not Implemented
@@ -68,13 +71,13 @@ The repository has a working foundation, web experience, API layer, schema, and 
 - Dead-letter queues, consumer groups, and retry acknowledgement semantics for Redis Streams.
 - Admin/KPI dashboard.
 - Self-service account delete, data export, and profile correction.
-- Complete audit logging to `audit_events`.
+- Complete audit administration, reporting, retention policy, and coverage beyond the Phase 1 audit events.
 - Production-grade Terraform/cloud infrastructure.
 - Recorded launch QA: Lighthouse, keyboard, screen reader, mobile devices, security review, and load tests.
 
 ## Remaining Work
 
-Phase 1 must close consistency and privacy blockers: privacy target, application-click tracking, audit-event writes, legacy placeholder cleanup, staging env confirmation, and basic QA evidence.
+Phase 1 has closed the local consistency blockers for privacy target, application-click tracking, selected audit-event writes, legacy placeholder cleanup, and basic local browser smoke evidence. Remaining Phase 1 work is staging Supabase confirmation plus manual keyboard, screen-reader, mobile, and production performance QA evidence.
 
 Phase 2 should implement planned product expansion: resume parsing, embeddings, semantic matching, generated quick prep, alert evaluator/delivery, webhook receivers, and robust Redis processing.
 
@@ -90,12 +93,13 @@ Maintained docs now live in:
 - `docs/md/developer-handoff.md`
 - `docs/md/project-status.md`
 - `docs/md/project-gap-analysis.md`
+- `docs/qa/phase-1-critical-completion.md`
 
 Older duplicate API/status/module docs were removed. Existing ADR and privacy documents remain as decision/compliance references.
 
 ## Verification
 
-Commands verified locally during this documentation audit:
+Commands verified locally during this Phase 1 pass:
 
 ```powershell
 npm run test --workspace=apps/web
@@ -104,9 +108,9 @@ npm run test --workspace=apps/web
 .\.venv-job-globe\Scripts\python.exe packages/database/scripts/validate_migrations.py packages/database/migrations
 ```
 
-Results on 2026-05-10:
+Results on 2026-05-11:
 
-- Web tests: 4 files, 46 tests passed.
-- Worker mypy: 44 source files passed.
+- Web tests: 5 files, 48 tests passed.
+- Worker mypy: 45 source files passed.
 - Worker pytest: 86 tests passed.
 - Migration validation: 13 files, 17 tables, pgvector, and GIN indexes present.

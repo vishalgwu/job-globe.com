@@ -51,7 +51,7 @@ export function JobPanel({ job, isOpen, isSaved, isLoading, onClose, onSave }: J
           <p className="trust-line">{job.trustLine}</p>
           <p className="detail-summary">{job.summary}</p>
           <div className="action-row">
-            <ApplyCTA applyUrl={job.applyUrl} />
+            <ApplyCTA applyUrl={job.applyUrl} jobId={job.id} />
             <button
               className="secondary-cta"
               type="button"

@@ -607,6 +607,63 @@ summary {
   gap: var(--space-md);
 }
 
+.policy-page {
+  background: #09111f;
+  color: #f8fafc;
+  min-height: 100vh;
+  padding: var(--space-lg);
+}
+
+.policy-shell {
+  background: rgb(15 23 42 / 0.88);
+  border: 1px solid rgb(148 163 184 / 0.22);
+  border-radius: var(--radius-md);
+  display: grid;
+  gap: var(--space-lg);
+  margin: 0 auto;
+  max-width: 860px;
+  padding: var(--space-xl);
+}
+
+.policy-shell h1,
+.policy-shell h2,
+.policy-shell p {
+  margin: 0;
+}
+
+.policy-shell h1 {
+  font-size: clamp(1.9rem, 5vw, 2.75rem);
+  line-height: var(--line-height-tight);
+}
+
+.policy-shell h2 {
+  font-size: var(--font-size-xl);
+}
+
+.policy-shell section {
+  border-top: 1px solid rgb(148 163 184 / 0.18);
+  display: grid;
+  gap: var(--space-sm);
+  padding-top: var(--space-md);
+}
+
+.policy-shell ul {
+  display: grid;
+  gap: var(--space-sm);
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.policy-lede,
+.policy-shell li,
+.policy-shell p {
+  color: #cbd5e1;
+}
+
+.policy-shell code {
+  color: #5eead4;
+}
+
 @media (max-width: 1080px) {
   .globe-app {
     grid-template-columns: 1fr;

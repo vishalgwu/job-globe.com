@@ -27,6 +27,7 @@ import structlog
 from job_globe_workers.agents.verification.url_checker import check_url
 from job_globe_workers.db.connection import get_pool
 from job_globe_workers.db.repositories.agent_runs import finish_agent_run, start_agent_run
+from job_globe_workers.db.repositories.audit import record_worker_failure
 from job_globe_workers.db.repositories.jobs import mark_raw_job_verified, upsert_raw_job
 from job_globe_workers.event_bus.consumer import read_events
 from job_globe_workers.event_bus.producer import publish_event
@@ -150,6 +151,12 @@ def run_verification_loop(stop_event: threading.Event) -> None:
                         "verification.event_error",
                         msg_id=msg_id,
                         error=str(exc),
+                    )
+                    record_worker_failure(
+                        pool,
+                        agent_name="verification",
+                        error=exc,
+                        metadata={"messageId": msg_id},
                     )
     finally:
         with pool.connection() as conn:

@@ -34,9 +34,12 @@ Supabase Auth/Storage -> protected user and resume workflows
 - Main globe experience at `apps/web/app/(globe)/page.tsx`.
 - Filter bar, zoom controls, CSS/React globe view, fallback map, accessible list mode, and job panel.
 - Login, register, onboarding, profile, saved jobs, applications, and alerts pages.
+- Draft privacy notice at `/privacy`.
 - Jobs, profile, resume, saved jobs, alerts, applications, health, and auth API routes.
 - Supabase auth resolution into internal `users` rows.
 - Resume raw upload, signed URL read, and raw object delete.
+- Apply CTA records authenticated redirects before opening the official apply URL.
+- Selected audit-event writes exist for high-risk user actions and worker failures.
 - Active worker package with discovery, verification, company identity, geo mapping, taxonomy tagging, canonical job upsert, Redis helpers, and DB repositories.
 - Seven source connector classes: Greenhouse, Lever, Adzuna, USAJOBS, EURES, Workable, and SmartRecruiters.
 - 13 database migrations, 17 application tables, pgvector, taxonomy seed, and demo job seed.
@@ -61,8 +64,6 @@ In progress or missing:
 
 - `IntroOverlay` exists but is not wired into the active globe page.
 - `useAlerts()` and `useMatchScore()` are stubs.
-- `ApplyCTA` validates and opens external URLs, but does not record application clicks through `POST /api/applications`.
-- The `/privacy` route linked from resume consent is missing.
 - Launch accessibility/performance evidence is not recorded.
 
 ## API
@@ -87,8 +88,8 @@ In progress or missing:
 
 - No delete account, export data, or parsed-profile correction APIs.
 - Alert CRUD exists, but no background alert evaluator/delivery worker.
-- Application API exists, but the main job panel does not call it.
-- Audit-event writes are not wired for significant user/system actions.
+- Application status lifecycle beyond `redirected` is not implemented.
+- Audit administration, retention, and complete event coverage are not implemented.
 
 ## Workers
 
@@ -113,7 +114,7 @@ In progress or missing:
 - No embedding generation worker.
 - No alert evaluation/delivery worker.
 - No webhook receiver, dead-letter queue, consumer group acking, or explicit rate-limit bucket implementation.
-- Legacy top-level worker folders contain placeholders and should not be treated as the active implementation.
+- Earlier top-level worker placeholder folders were removed; keep new worker code under `apps/workers/src/job_globe_workers`.
 
 ## Database
 
@@ -130,7 +131,7 @@ Key files:
 In progress or missing:
 
 - Embedding tables exist, but no active generation pipeline writes them.
-- Audit table exists, but actions are not consistently logged.
+- Audit table exists and selected Phase 1 events are logged, but retention/reporting coverage is incomplete.
 - Alert table exists, but no delivery history table exists.
 - No production backup/restore runbook in this repo.
 
@@ -152,7 +153,7 @@ In progress or missing:
 
 ## Remaining Work
 
-- Phase 1: privacy route/policy target, application-click tracking, audit-event writes, legacy placeholder cleanup, staging env confirmation, QA evidence.
+- Phase 1: staging Supabase confirmation plus browser, keyboard, screen-reader, and basic performance QA evidence.
 - Phase 2: resume parsing, profile correction UI, embeddings, semantic matching, generated quick prep, alert delivery, webhooks, Redis consumer groups/retries/dead letters.
 - Phase 3: production worker deployment, real infrastructure, observability, runbooks, load tests, replay tests, backup/restore, rollback, and security review evidence.
 

@@ -26,7 +26,7 @@ Repository shape:
 ```text
 apps/
   web/                 Next.js frontend and API routes
-  workers/             Python worker package, tests, and legacy placeholder folders
+  workers/             Python worker package and tests
   jarvis-job-globe/    Static prototype/reference app
 packages/
   database/            SQL migrations, seeds, and migration scripts
@@ -48,8 +48,11 @@ docs/
 
 - Next.js App Router app with globe, auth, onboarding, profile, saved jobs, applications, and alerts pages.
 - Route handlers for jobs, health, auth session/refresh/logout, profile, resume, saved jobs, applications, and alerts.
+- Draft `/privacy` notice route for controlled demos.
 - Supabase auth resolution into the internal `users` table.
 - Supabase Storage resume upload, signed URL read, and raw object delete.
+- Application redirects are recorded through `POST /api/applications` before the Apply CTA opens the external URL.
+- Audit-event writes exist for selected high-risk user and worker actions.
 - PostgreSQL schema with 13 migrations, 17 application tables, pgvector, indexes, taxonomy seed, and demo job seed.
 - Python worker package with discovery, verification, company identity, geo mapping, taxonomy tagging, canonical upsert, Redis helpers, and DB repositories.
 - Source connector classes for Greenhouse, Lever, Adzuna, USAJOBS, EURES, Workable, and SmartRecruiters.
@@ -70,6 +73,7 @@ Implemented pages:
 - `/saved`
 - `/applications`
 - `/alerts`
+- `/privacy`
 
 The active globe experience is implemented mainly in `components/globe/GlobeExperience`, `GlobeCanvas`, and `FallbackMap`. The UI exposes global, country, city/company, and role-marker views. The role-marker view is labelled "Neighbourhood" in the UI, but the API backs it with `mode=jobs`, not a separate neighbourhood data model.
 
@@ -130,22 +134,18 @@ Discovery runner
   -> jobs_canonical
 ```
 
-The older top-level worker folders under `apps/workers/agents`, `embeddings`, `event_bus`, `observability`, `parsers`, and `scoring` are not the active package path. Several of those files are stubs or "moved" placeholders.
+The active worker package lives under `apps/workers/src/job_globe_workers`. The earlier top-level placeholder worker folders have been removed so the package path is the source of truth.
 
 ## In Progress
 
-- Application API and page exist, but `ApplyCTA` does not call `POST /api/applications`.
 - Resume upload and raw delete exist, but PDF/DOCX parsing, structured extraction, correction UI, and retention jobs are missing.
 - Match breakdown UI and rule-based scoring exist, but embeddings and pgvector retrieval are not active.
 - Alerts CRUD exists, but there is no background evaluator, notification feed, or email delivery.
-- `audit_events` exists in schema, but user and worker actions are not consistently written to it.
+- `audit_events` is written for key Phase 1 actions, but full audit administration, retention, and coverage are not complete.
 - Terraform and staging deployment files are placeholders.
 
 ## Remaining Work
 
-- Add or replace the missing `/privacy` target used by resume consent.
-- Wire apply-click recording into the job panel.
-- Add audit-event write helpers and use them in sensitive routes/workers.
 - Implement resume parsing, embeddings, alert delivery, and generated quick-prep.
 - Add Redis consumer groups, acknowledgement, retry, and dead-letter handling.
 - Define production worker deployment, observability, rollback, backup/restore, and launch QA evidence.

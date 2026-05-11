@@ -19,7 +19,9 @@ Job listings are scattered across company career sites, ATS-hosted boards, gover
 - Resume raw-file upload, signed URL fetch, and raw object delete through Supabase Storage.
 - Saved jobs for authenticated users, with session-storage fallback for anonymous users.
 - Authenticated alerts CRUD.
-- Authenticated application history API and page.
+- Authenticated application click recording, history API, and applications page.
+- Draft `/privacy` notice route for controlled demos.
+- Audit-event writes for profile updates, resume upload/delete, saved jobs, application redirects, alert create/delete, and worker failures.
 - Python worker package for job discovery, URL verification, company identity, geo mapping, taxonomy tagging, and canonical job upsert.
 - PostgreSQL migrations, taxonomy seed, and demo job seed.
 - Local web tests, worker type checks, worker tests, and migration validation.
@@ -30,8 +32,8 @@ Job listings are scattered across company career sites, ATS-hosted boards, gover
 - Resume PDF/DOCX parsing and structured profile extraction.
 - Job/profile embedding generation and pgvector-backed semantic matching.
 - Generated quick-prep content and caching.
-- Privacy page, account deletion, data export, and parsed-profile correction.
-- Apply-click recording from the main job panel.
+- Account deletion, data export, and parsed-profile correction.
+- Complete audit administration, retention policy, and reporting.
 - Production worker deployment and real Terraform infrastructure.
 - Recorded launch QA, load testing, and security review evidence.
 
@@ -52,7 +54,7 @@ Job listings are scattered across company career sites, ATS-hosted boards, gover
 ```text
 apps/
   web/                 Next.js frontend and API routes
-  workers/             Python worker package, tests, and legacy placeholder folders
+  workers/             Python worker package and tests
   jarvis-job-globe/    Static prototype/reference app, not the production app
 packages/
   database/            SQL migrations, seeds, and migration scripts
@@ -76,6 +78,7 @@ Maintained docs:
 - `docs/md/project-status.md`
 - `docs/md/developer-handoff.md`
 - `docs/md/project-gap-analysis.md`
+- `docs/qa/phase-1-critical-completion.md`
 
 Decision and privacy references:
 
@@ -135,7 +138,7 @@ psql "$env:DATABASE_URL" -v ON_ERROR_STOP=1 -f packages/database/seeds/taxonomy_
 
 ## Verification
 
-Commands verified locally during the documentation audit on 2026-05-10:
+Commands verified locally during the Phase 1 pass on 2026-05-11:
 
 ```powershell
 npm run test --workspace=apps/web
@@ -152,11 +155,9 @@ Current state: working foundation with a functional web app, API layer, database
 
 ### Phase 1 - Critical Completion
 
-- Add or replace the missing `/privacy` policy target.
-- Record application clicks from the Apply CTA.
-- Add audit-event writes for sensitive user and worker actions.
-- Clean or quarantine legacy worker placeholder folders.
 - Confirm Supabase staging configuration and record launch QA evidence.
+- Complete manual keyboard, screen-reader, mobile, and production performance QA evidence.
+- Decide whether the draft `/privacy` route is enough for demos or should point to a reviewed external policy.
 
 ### Phase 2 - Feature Expansion
 

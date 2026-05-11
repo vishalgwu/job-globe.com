@@ -40,6 +40,7 @@ from job_globe_workers.db.repositories.agent_runs import (
     get_last_run_time,
     start_agent_run,
 )
+from job_globe_workers.db.repositories.audit import record_worker_failure
 from job_globe_workers.event_bus.producer import publish_event
 from job_globe_workers.settings import settings
 
@@ -153,12 +154,30 @@ def run_discovery_once(stop_event: threading.Event | None = None) -> None:
                         source=source_name,
                         error=str(exc),
                     )
+                    record_worker_failure(
+                        pool,
+                        agent_name="discovery",
+                        error=exc,
+                        metadata={
+                            "failurePoint": "publish",
+                            "source": source_name,
+                        },
+                    )
         except Exception as exc:  # noqa: BLE001
             error_msg = str(exc)
             logger.error(
                 "discovery.connector.failed",
                 source=source_name,
                 error=error_msg,
+            )
+            record_worker_failure(
+                pool,
+                agent_name="discovery",
+                error=exc,
+                metadata={
+                    "failurePoint": "connector",
+                    "source": source_name,
+                },
             )
 
         with pool.connection() as conn:
@@ -193,6 +212,17 @@ def run_discovery_loop(stop_event: threading.Event) -> None:
             run_discovery_once(stop_event)
         except Exception as exc:  # noqa: BLE001
             logger.error("discovery.loop.unhandled_error", error=str(exc))
+            try:
+                pool = get_pool()
+            except Exception:  # noqa: BLE001
+                pool = None
+            if pool is not None:
+                record_worker_failure(
+                    pool,
+                    agent_name="discovery",
+                    error=exc,
+                    metadata={"failurePoint": "loop"},
+                )
         # Sleep in small increments so we react to stop_event quickly
         _interruptible_sleep(settings.worker_poll_interval_seconds * 12, stop_event)
     logger.info("discovery.loop.stopped")

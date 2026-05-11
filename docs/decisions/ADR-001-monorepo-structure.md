@@ -14,7 +14,7 @@ The build plan requires a Next.js frontend, a Python worker plane, shared schema
 
 ## Current Implementation Notes
 
-The repository follows this structure. The active worker package lives under `apps/workers/src/job_globe_workers`. Some older top-level folders under `apps/workers` contain placeholders and should not be treated as active shared modules.
+The repository follows this structure. The active worker package lives under `apps/workers/src/job_globe_workers`; earlier top-level worker placeholder folders were removed during Phase 1 cleanup.
 
 ## Consequences
 

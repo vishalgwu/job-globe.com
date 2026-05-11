@@ -10,6 +10,7 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 
+import { recordAuditEvent } from "../../../lib/audit/events";
 import { resolveRequestUser } from "../../../lib/supabase/auth";
 import { createServerSupabaseClient } from "../../../lib/supabase/server";
 
@@ -81,9 +82,10 @@ export async function POST(request: NextRequest) {
   }
 
   const jobId = (payload as Record<string, string>).jobId;
-  const notes = typeof (payload as Record<string, unknown>).notes === "string"
-    ? (payload as Record<string, string>).notes
-    : null;
+  const notes =
+    typeof (payload as Record<string, unknown>).notes === "string"
+      ? (payload as Record<string, string>).notes
+      : null;
 
   try {
     const supabase = createServerSupabaseClient();
@@ -95,6 +97,16 @@ export async function POST(request: NextRequest) {
       console.error("saved_jobs POST error", error);
       return NextResponse.json({ error: "Failed to save job." }, { status: 500 });
     }
+
+    await recordAuditEvent(supabase, request, {
+      actorUserId: user.id,
+      eventType: "saved_job.created",
+      subjectType: "job",
+      subjectId: jobId,
+      metadata: {
+        hasNotes: Boolean(notes),
+      },
+    });
 
     return NextResponse.json({ ok: true, jobId });
   } catch (err) {
@@ -128,6 +140,14 @@ export async function DELETE(request: NextRequest) {
       console.error("saved_jobs DELETE error", error);
       return NextResponse.json({ error: "Failed to remove saved job." }, { status: 500 });
     }
+
+    await recordAuditEvent(supabase, request, {
+      actorUserId: user.id,
+      eventType: "saved_job.deleted",
+      subjectType: "job",
+      subjectId: jobId,
+      metadata: {},
+    });
 
     return NextResponse.json({ ok: true, jobId });
   } catch (err) {

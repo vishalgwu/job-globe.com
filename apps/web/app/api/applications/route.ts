@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
+import { recordAuditEvent } from "@/lib/audit/events";
 import { resolveRequestUser } from "@/lib/supabase/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -61,9 +62,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "apply_url is required." }, { status: 400 });
   }
 
+  let parsedApplyUrl: URL;
   try {
-    const parsed = new URL(apply_url);
-    if (!["http:", "https:"].includes(parsed.protocol)) {
+    parsedApplyUrl = new URL(apply_url);
+    if (!["http:", "https:"].includes(parsedApplyUrl.protocol)) {
       return NextResponse.json({ error: "apply_url must be http or https." }, { status: 400 });
     }
   } catch {
@@ -83,7 +85,7 @@ export async function POST(request: NextRequest) {
           applied_at: new Date().toISOString(),
           metadata: {},
         },
-        { onConflict: "user_id,job_id" }
+        { onConflict: "user_id,job_id" },
       )
       .select("id, job_id, apply_url, status, applied_at")
       .single();
@@ -92,6 +94,18 @@ export async function POST(request: NextRequest) {
       console.error("[applications] POST upsert failed:", error.message);
       return NextResponse.json({ error: "Failed to record application." }, { status: 500 });
     }
+
+    await recordAuditEvent(supabase, request, {
+      actorUserId: user.id,
+      eventType: "application.redirected",
+      subjectType: "job",
+      subjectId: job_id,
+      metadata: {
+        applicationId: data.id,
+        applyHost: parsedApplyUrl.hostname,
+        status: data.status,
+      },
+    });
 
     return NextResponse.json({ ok: true, application: data }, { status: 201 });
   } catch (err) {

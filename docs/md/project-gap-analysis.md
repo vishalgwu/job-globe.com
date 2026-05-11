@@ -4,29 +4,27 @@ This gap analysis compares the implemented codebase against the reference plan i
 
 ## Feature Gaps
 
-| Feature              | Current code                                                       | Gap                                                                                                                            |
-| -------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| Globe rendering      | Active React/CSS globe and fallback map exist.                     | Planned Globe.GL/deck.gl heatmap implementation is not active.                                                                 |
-| Immersive intro      | `IntroOverlay` component exists.                                   | It is not wired into the main page; audio/mute persistence is not implemented.                                                 |
-| Application tracking | API and `/applications` page exist.                                | Job panel Apply CTA does not call the API, so user clicks are not recorded from the main flow.                                 |
-| Resume parsing       | Upload, metadata, signed URL, and delete routes exist.             | PDF/DOCX parsing, structured extraction, confidence scoring, correction UI, and automated retention deletion are missing.      |
-| Match scoring        | Rule-based scorer exists and can blend a supplied embedding score. | No embedding generation, pgvector retrieval, 7-component scoring engine, or calibration workflow is active.                    |
-| Quick prep           | UI renders quick-prep fields from job detail.                      | No OpenAI generation or 24-hour per-user/job cache exists.                                                                     |
-| Alerts               | CRUD routes and alerts page exist.                                 | No scheduled evaluator, email delivery, digest bundling, or notification feed exists.                                          |
-| Worker ingestion     | Connectors and pipeline workers are implemented in package code.   | No repo evidence of live staging ingestion, webhook receiver, Redis consumer groups, dead-letter queue, or rate-limit buckets. |
-| Privacy controls     | Consent copy exists; raw resume delete route exists.               | `/privacy` page, delete account, data export, correction flow, and audit-event writes are missing.                             |
-| Infrastructure       | Docker and CI exist.                                               | Terraform, staging deploy automation, production worker hosting, rollback docs, and observability dashboards are missing.      |
+| Feature              | Current code                                                                                    | Gap                                                                                                                            |
+| -------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Globe rendering      | Active React/CSS globe and fallback map exist.                                                  | Planned Globe.GL/deck.gl heatmap implementation is not active.                                                                 |
+| Immersive intro      | `IntroOverlay` component exists.                                                                | It is not wired into the main page; audio/mute persistence is not implemented.                                                 |
+| Application tracking | API, `/applications` page, and Apply CTA redirect recording exist.                              | Application lifecycle beyond `redirected` is not implemented.                                                                  |
+| Resume parsing       | Upload, metadata, signed URL, and delete routes exist.                                          | PDF/DOCX parsing, structured extraction, confidence scoring, correction UI, and automated retention deletion are missing.      |
+| Match scoring        | Rule-based scorer exists and can blend a supplied embedding score.                              | No embedding generation, pgvector retrieval, 7-component scoring engine, or calibration workflow is active.                    |
+| Quick prep           | UI renders quick-prep fields from job detail.                                                   | No OpenAI generation or 24-hour per-user/job cache exists.                                                                     |
+| Alerts               | CRUD routes and alerts page exist.                                                              | No scheduled evaluator, email delivery, digest bundling, or notification feed exists.                                          |
+| Worker ingestion     | Connectors and pipeline workers are implemented in package code.                                | No repo evidence of live staging ingestion, webhook receiver, Redis consumer groups, dead-letter queue, or rate-limit buckets. |
+| Privacy controls     | Consent copy, draft `/privacy` route, raw resume delete route, and selected audit writes exist. | Delete account, data export, parsed-profile correction, audit administration, and legal sign-off are missing.                  |
+| Infrastructure       | Docker and CI exist.                                                                            | Terraform, staging deploy automation, production worker hosting, rollback docs, and observability dashboards are missing.      |
 
 ## Missing Components
 
-- Privacy page or route for the resume consent link.
-- Apply-click recording in the main job panel.
 - Background alert evaluator and delivery pipeline.
 - Resume parse worker for PDF/DOCX and structured profile extraction.
 - Embedding generation jobs for `job_embeddings` and `profile_embeddings`.
 - User-facing parsed profile correction flow.
 - Self-service account deletion and data export.
-- Audit-event write helpers used by API routes and workers.
+- Audit-event reporting, retention policy, admin access controls, and complete event coverage.
 - Webhook receivers for ATS sources.
 - Redis consumer groups, message acknowledgement, retries, and dead-letter queue handling.
 - Production worker deployment definition.
@@ -35,18 +33,15 @@ This gap analysis compares the implemented codebase against the reference plan i
 
 ## Technical Debt
 
-- Several top-level folders under `apps/workers` are legacy placeholders even though the active package lives in `apps/workers/src/job_globe_workers`.
 - `useAlerts()` and `useMatchScore()` are empty hooks.
 - The root `apps/jarvis-job-globe` static prototype remains in the repo as reference material but is not part of the production Next.js app.
-- API and UI behavior are not fully aligned for application tracking.
 - Some code comments and demo strings still refer to older phase/placeholder language.
-- The database schema is ahead of implementation for embeddings, audit events, and some compliance workflows.
+- The database schema is ahead of implementation for embeddings and some compliance workflows.
 - Terraform files are placeholders but still part of the infrastructure tree.
 
 ## Risks And Blockers
 
-- Privacy risk: resume upload exists before full privacy page, account deletion, export, and correction workflows.
-- Product trust risk: users may expect application tracking to work because the `/applications` page says Apply clicks appear there, but the main Apply CTA does not record them.
+- Privacy risk: resume upload exists before account deletion, export, correction workflows, and legal/privacy sign-off.
 - Operational risk: worker code exists, but production deployment and live-run evidence are not captured in the repo.
 - Data quality risk: live source ingestion lacks repo-visible rate-limit buckets, dead-letter handling, and provenance display in the web UI.
 - AI trust risk: match UI exists, but semantic scoring and resume-derived profile data are not implemented.
@@ -61,19 +56,16 @@ Goal: make the current product internally consistent, privacy-safe enough for co
 
 Tasks:
 
-- Add or remove the `/privacy` link path so resume consent does not point to a missing route.
-- Wire `ApplyCTA` to `POST /api/applications` before opening the official apply URL for authenticated users.
-- Add audit-event writes for resume upload/delete, profile update, save job, apply click, alert create/delete, and worker failures.
 - Confirm Supabase environment variables and auth/session behavior in staging.
-- Clean or clearly quarantine legacy worker placeholder folders.
-- Record current QA evidence for browser, keyboard, screen reader, and basic performance checks.
+- Complete manual keyboard, screen-reader, mobile, and production performance QA evidence.
 - Keep web tests, worker mypy, worker pytest, and migration validation green.
+- Decide whether the draft `/privacy` route is enough for controlled demos or must point to an externally reviewed policy.
 
 Dependencies:
 
 - Supabase staging project and service-role configuration.
-- Product decision on whether `/privacy` should be an app page or external policy URL.
-- Agreement on audit-event helper shape.
+- Product/legal decision on whether `/privacy` should remain an app page or become an external policy URL.
+- Manual QA owner for keyboard, screen-reader, mobile, and production performance evidence.
 
 ### Phase 2 - Feature Expansion
 
@@ -124,8 +116,7 @@ Dependencies:
 
 ## Clear Next Steps
 
-1. Fix the missing privacy route or update the resume consent link.
-2. Record application clicks from the job panel.
-3. Add audit-event helper and wire the highest-risk user actions.
-4. Decide alert delivery scope for the next release.
-5. Start resume parsing only after privacy copy and data-processing scope are approved.
+1. Confirm staging Supabase variables, `/api/health`, and `/api/auth/session`.
+2. Complete manual keyboard, screen-reader, mobile, and production performance QA evidence.
+3. Decide alert delivery scope for the next release.
+4. Start resume parsing only after privacy copy and data-processing scope are approved.

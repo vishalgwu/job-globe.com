@@ -9,6 +9,8 @@ from typing import Any
 import structlog
 
 from job_globe_workers.agents.company_identity.resolver import resolve_company
+from job_globe_workers.db.connection import get_pool
+from job_globe_workers.db.repositories.audit import record_worker_failure
 from job_globe_workers.event_bus.consumer import read_events
 from job_globe_workers.event_bus.producer import publish_event
 from job_globe_workers.settings import settings
@@ -33,8 +35,10 @@ def _deserialise(payload: dict[str, str]) -> dict[str, Any]:
 
 def run_company_identity_loop(stop_event: threading.Event) -> None:
     """Consume verification stream, resolve company identity, forward downstream."""
+    pool = get_pool()
     last_id = "0-0"
     processed = 0
+    failed = 0
     logger.info("company_identity.loop.started")
 
     while not stop_event.is_set():
@@ -66,6 +70,13 @@ def run_company_identity_loop(stop_event: threading.Event) -> None:
                 processed += 1
                 last_id = msg_id
             except Exception as exc:  # noqa: BLE001
+                failed += 1
                 logger.error("company_identity.event_error", error=str(exc))
+                record_worker_failure(
+                    pool,
+                    agent_name="company_identity",
+                    error=exc,
+                    metadata={"messageId": msg_id},
+                )
 
-    logger.info("company_identity.loop.stopped", processed=processed)
+    logger.info("company_identity.loop.stopped", processed=processed, failed=failed)

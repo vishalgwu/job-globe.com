@@ -12,7 +12,7 @@ This document reflects the current codebase and the remaining privacy work neede
 - Profile data: headline, preferred locations, remote preference, work authorization, salary expectation, onboarding preferences, resume consent flag.
 - Resume metadata: raw storage object key, file hash, raw delete deadline, parser version, parsed text field, parsed profile JSON, confidence JSON, retention flag.
 - Product data: saved jobs, application redirect records, alert subscriptions.
-- System data: agent run logs and audit-event table schema.
+- System data: agent run logs and selected audit-event writes.
 
 ## Current Resume Handling
 
@@ -24,6 +24,7 @@ Implemented:
 - Raw file hash and retention deadline are stored in `resume_extractions`.
 - Signed URLs are short-lived.
 - Users can call `DELETE /api/resume` to remove the raw object and clear the object key.
+- Resume upload/delete actions write selected audit events.
 
 Not implemented:
 
@@ -32,7 +33,7 @@ Not implemented:
 - User correction flow for parsed fields.
 - Automated raw-file deletion after the retention deadline.
 - Account-level delete/export/correction flows.
-- Privacy policy page at `/privacy`, even though resume consent links to it.
+- Legal-approved final privacy policy copy.
 
 ## Lawful Basis Targets
 
@@ -56,11 +57,11 @@ These targets are planned policy requirements and still need legal review:
 Implemented:
 
 - Resume upload includes consent text and raw retention language.
+- A draft `/privacy` route exists for controlled demos.
 - Work authorization and salary fields are optional in onboarding/profile validation.
 
 Missing:
 
-- `/privacy` route or external policy page.
 - Notice at onboarding start that clearly explains profile data collection.
 - Delete account, export data, and correction controls.
 - Admin-only access path for audit/compliance records.
@@ -81,10 +82,9 @@ Planned but not fully active:
 
 ## Launch Blocking Privacy Gaps
 
-- Missing `/privacy` page or policy target.
 - No self-service account deletion.
 - No data export.
 - No profile correction flow for parsed resume data.
 - No automated raw resume retention job.
-- No consistent writes to `audit_events`.
+- No audit-event retention policy, reporting UI, or complete event coverage.
 - No legal/privacy sign-off evidence in the repository.

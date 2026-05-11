@@ -21,6 +21,7 @@ import crypto from "node:crypto";
 
 import { type NextRequest, NextResponse } from "next/server";
 
+import { recordAuditEvent } from "../../../lib/audit/events";
 import { resolveRequestUser } from "../../../lib/supabase/auth";
 import { createServerSupabaseClient } from "../../../lib/supabase/server";
 
@@ -47,8 +48,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing file field in form data." }, { status: 400 });
   }
 
-  const originalName =
-    file instanceof File ? file.name : "resume";
+  const originalName = file instanceof File ? file.name : "resume";
   const extension = originalName.split(".").pop() ?? "pdf";
   const allowedExtensions = ["pdf", "doc", "docx", "txt", "rtf"];
   if (!allowedExtensions.includes(extension.toLowerCase())) {
@@ -86,12 +86,10 @@ export async function POST(request: NextRequest) {
 
     // Retention deadline
     const retentionDays = Number(process.env.RESUME_RAW_RETENTION_DAYS ?? 30);
-    const rawDeleteAfter = new Date(
-      Date.now() + retentionDays * 24 * 60 * 60 * 1000,
-    ).toISOString();
+    const rawDeleteAfter = new Date(Date.now() + retentionDays * 24 * 60 * 60 * 1000).toISOString();
 
     // Upsert resume_extractions row (one per user — latest wins)
-    const { error: dbError } = await supabase
+    const { data: resumeRow, error: dbError } = await supabase
       .from("resume_extractions")
       .upsert(
         {
@@ -106,9 +104,11 @@ export async function POST(request: NextRequest) {
           confidence: {},
         },
         { onConflict: "user_id" },
-      );
+      )
+      .select("id, raw_delete_after")
+      .single();
 
-    if (dbError) {
+    if (dbError || !resumeRow) {
       // Clean up the orphaned storage object
       await supabase.storage.from(RESUME_BUCKET).remove([objectKey]);
       console.error("resume_extractions upsert error", dbError);
@@ -119,6 +119,20 @@ export async function POST(request: NextRequest) {
     const { data: signedData } = await supabase.storage
       .from(RESUME_BUCKET)
       .createSignedUrl(objectKey, SIGNED_URL_TTL_SECONDS);
+
+    await recordAuditEvent(supabase, request, {
+      actorUserId: user.id,
+      eventType: "resume.uploaded",
+      subjectType: "resume_extraction",
+      subjectId: resumeRow.id,
+      metadata: {
+        contentType: file.type || "application/octet-stream",
+        extension: extension.toLowerCase(),
+        fileSizeBytes: file.size,
+        rawDeleteAfter: resumeRow.raw_delete_after,
+        retentionDays,
+      },
+    });
 
     return NextResponse.json({
       ok: true,
@@ -183,7 +197,7 @@ export async function DELETE(request: NextRequest) {
 
     const { data: row } = await supabase
       .from("resume_extractions")
-      .select("raw_object_key")
+      .select("id, raw_object_key")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -192,13 +206,33 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Remove from storage
-    await supabase.storage.from(RESUME_BUCKET).remove([row.raw_object_key]);
+    const { error: removeError } = await supabase.storage
+      .from(RESUME_BUCKET)
+      .remove([row.raw_object_key]);
+
+    if (removeError) {
+      console.error("resume storage delete error", removeError);
+      return NextResponse.json({ error: "Failed to delete resume." }, { status: 500 });
+    }
 
     // Null out the object key — parsed extraction is retained per privacy policy
-    await supabase
+    const { error: updateError } = await supabase
       .from("resume_extractions")
       .update({ raw_object_key: null })
       .eq("user_id", user.id);
+
+    if (updateError) {
+      console.error("resume_extractions delete update error", updateError);
+      return NextResponse.json({ error: "Failed to update resume record." }, { status: 500 });
+    }
+
+    await recordAuditEvent(supabase, request, {
+      actorUserId: user.id,
+      eventType: "resume.raw_deleted",
+      subjectType: "resume_extraction",
+      subjectId: row.id,
+      metadata: { rawObjectDeleted: true },
+    });
 
     return NextResponse.json({ ok: true, message: "Raw resume deleted." });
   } catch (err) {
