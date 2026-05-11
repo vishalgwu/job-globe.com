@@ -24,6 +24,7 @@ Job listings are scattered across company career sites, ATS-hosted boards, gover
 - Audit-event writes for profile updates, resume upload/delete, saved jobs, application redirects, alert create/delete, and worker failures.
 - Python worker package for job discovery, URL verification, company identity, geo mapping, taxonomy tagging, and canonical job upsert.
 - PostgreSQL migrations, taxonomy seed, and demo job seed.
+- Phase 1 staging smoke evidence for Supabase health, authenticated user flow, audit rows, keyboard traversal, mobile viewport, accessibility tree, and basic performance timing.
 - Local web tests, worker type checks, worker tests, and migration validation.
 
 ## Not Yet Implemented
@@ -35,7 +36,7 @@ Job listings are scattered across company career sites, ATS-hosted boards, gover
 - Account deletion, data export, and parsed-profile correction.
 - Complete audit administration, retention policy, and reporting.
 - Production worker deployment and real Terraform infrastructure.
-- Recorded launch QA, load testing, and security review evidence.
+- Full launch QA, load testing, legal/privacy review, and security review evidence.
 
 ## Tech Stack
 
@@ -141,7 +142,11 @@ psql "$env:DATABASE_URL" -v ON_ERROR_STOP=1 -f packages/database/seeds/taxonomy_
 Commands verified locally during the Phase 1 pass on 2026-05-11:
 
 ```powershell
+npm run lint
+npm run typecheck
+npm run build
 npm run test --workspace=apps/web
+.\.venv-job-globe\Scripts\python.exe -m ruff check apps/workers
 .\.venv-job-globe\Scripts\python.exe -m mypy apps/workers/src
 .\.venv-job-globe\Scripts\python.exe -m pytest apps/workers/tests
 .\.venv-job-globe\Scripts\python.exe packages/database/scripts/validate_migrations.py packages/database/migrations
@@ -149,15 +154,14 @@ npm run test --workspace=apps/web
 
 ## Current Status
 
-Current state: working foundation with a functional web app, API layer, database schema, and worker pipeline code. The worker pipeline exists in code but is not production-proven from this repository. AI matching, resume parsing, alert delivery, privacy self-service, observability, and production deployment remain open.
+Current state: working foundation with a functional web app, API layer, database schema, worker pipeline code, and controlled-demo Phase 1 staging evidence. The worker pipeline exists in code but is not production-proven from this repository. AI matching, resume parsing, alert delivery, privacy self-service, observability, and production deployment remain open.
 
 ## Roadmap
 
 ### Phase 1 - Critical Completion
 
-- Confirm Supabase staging configuration and record launch QA evidence.
-- Complete manual keyboard, screen-reader, mobile, and production performance QA evidence.
-- Decide whether the draft `/privacy` route is enough for demos or should point to a reviewed external policy.
+- Completed for controlled demos: Supabase staging health, authenticated flow, audit-row confirmation, private resume bucket, draft `/privacy` route decision, mobile/keyboard/accessibility-tree/performance smoke evidence, and migration validation.
+- Remaining before public launch: human screen-reader pass, legal/privacy policy approval, security review, and broader production QA.
 
 ### Phase 2 - Feature Expansion
 

@@ -1,0 +1,379 @@
+{
+  "capturedAt": "2026-05-11T01:31:06.922Z",
+  "baseUrl": "http://127.0.0.1:3000",
+  "chrome": "Chrome/147.0.7727.138",
+  "screenshots": [
+    "home-mobile-390x844.png",
+    "privacy-mobile-390x844.png"
+  ],
+  "keyboard": [
+    {
+      "route": "/",
+      "focusableCount": 232,
+      "samplesEvaluated": 16,
+      "tabSamples": [
+        {
+          "tag": "A",
+          "role": null,
+          "type": null,
+          "href": "http://127.0.0.1:3000/#globe-list-mode",
+          "text": "Skip to job li t",
+          "visibleFocus": true
+        },
+        {
+          "tag": "INPUT",
+          "role": null,
+          "type": "search",
+          "href": null,
+          "text": "",
+          "visibleFocus": true
+        },
+        {
+          "tag": "SELECT",
+          "role": null,
+          "type": null,
+          "href": null,
+          "text": "All\nSoftware\nAI / ML\nData\nDe ign\nSecurity\nOperation ",
+          "visibleFocus": true
+        },
+        {
+          "tag": "SELECT",
+          "role": null,
+          "type": null,
+          "href": null,
+          "text": "Global\nUnited State \nCanada\nUnited Kingdom\nGermany\nSingapore",
+          "visibleFocus": true
+        },
+        {
+          "tag": "SELECT",
+          "role": null,
+          "type": null,
+          "href": null,
+          "text": "All\nRemote\nHybrid\nOn- ite",
+          "visibleFocus": true
+        },
+        {
+          "tag": "SELECT",
+          "role": null,
+          "type": null,
+          "href": null,
+          "text": "All\nIntern hip\nNew grad\nFull-time\nContract",
+          "visibleFocus": true
+        },
+        {
+          "tag": "SELECT",
+          "role": null,
+          "type": null,
+          "href": null,
+          "text": "Any time\nPa t 1 hour\nPa t 6 hour \nPa t 1 day\nPa t 7 day \nPa t month",
+          "visibleFocus": true
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "type": null,
+          "href": "http://127.0.0.1:3000/onboarding",
+          "text": "Profile",
+          "visibleFocus": true
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "type": "button",
+          "href": null,
+          "text": "2D",
+          "visibleFocus": true
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "type": "button",
+          "href": null,
+          "text": "Li t",
+          "visibleFocus": true
+        },
+        {
+          "tag": "BUTTON",
+          "role": "tab",
+          "type": "button",
+          "href": null,
+          "text": "Global",
+          "visibleFocus": true
+        },
+        {
+          "tag": "BUTTON",
+          "role": "tab",
+          "type": "button",
+          "href": null,
+          "text": "Country",
+          "visibleFocus": true
+        },
+        {
+          "tag": "BUTTON",
+          "role": "tab",
+          "type": "button",
+          "href": null,
+          "text": "City",
+          "visibleFocus": true
+        },
+        {
+          "tag": "BUTTON",
+          "role": "tab",
+          "type": "button",
+          "href": null,
+          "text": "Neighbourhood",
+          "visibleFocus": true
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "type": "button",
+          "href": null,
+          "text": "Au tralia",
+          "visibleFocus": true
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "type": "button",
+          "href": null,
+          "text": "Brazil",
+          "visibleFocus": true
+        }
+      ],
+      "invalidFirstCycleCount": 0,
+      "pass": true
+    },
+    {
+      "route": "/privacy",
+      "focusableCount": 0,
+      "samplesEvaluated": 0,
+      "tabSamples": [
+        {
+          "tag": "NEXTJS-PORTAL",
+          "role": null,
+          "type": null,
+          "href": null,
+          "text": "",
+          "visibleFocus": false
+        },
+        {
+          "tag": "BODY",
+          "role": null,
+          "type": null,
+          "href": null,
+          "text": "PRIVACY\n\nJob Globe Privacy Notice\n\nThi  notice reflect  the privacy behavior currently implemented i",
+          "visibleFocus": false
+        },
+        {
+          "tag": "NEXTJS-PORTAL",
+          "role": null,
+          "type": null,
+          "href": null,
+          "text": "",
+          "visibleFocus": false
+        },
+        {
+          "tag": "NEXTJS-PORTAL",
+          "role": null,
+          "type": null,
+          "href": null,
+          "text": "",
+          "visibleFocus": false
+        },
+        {
+          "tag": "BODY",
+          "role": null,
+          "type": null,
+          "href": null,
+          "text": "PRIVACY\n\nJob Globe Privacy Notice\n\nThi  notice reflect  the privacy behavior currently implemented i",
+          "visibleFocus": false
+        },
+        {
+          "tag": "NEXTJS-PORTAL",
+          "role": null,
+          "type": null,
+          "href": null,
+          "text": "",
+          "visibleFocus": false
+        },
+        {
+          "tag": "BODY",
+          "role": null,
+          "type": null,
+          "href": null,
+          "text": "PRIVACY\n\nJob Globe Privacy Notice\n\nThi  notice reflect  the privacy behavior currently implemented i",
+          "visibleFocus": false
+        },
+        {
+          "tag": "NEXTJS-PORTAL",
+          "role": null,
+          "type": null,
+          "href": null,
+          "text": "",
+          "visibleFocus": false
+        }
+      ],
+      "invalidFirstCycleCount": 0,
+      "pass": true
+    },
+    {
+      "route": "/login",
+      "focusableCount": 5,
+      "samplesEvaluated": 5,
+      "tabSamples": [
+        {
+          "tag": "A",
+          "role": null,
+          "type": null,
+          "href": "http://127.0.0.1:3000/",
+          "text": "Cancel",
+          "visibleFocus": true
+        },
+        {
+          "tag": "INPUT",
+          "role": null,
+          "type": "email",
+          "href": null,
+          "text": "",
+          "visibleFocus": true
+        },
+        {
+          "tag": "INPUT",
+          "role": null,
+          "type": "password",
+          "href": null,
+          "text": "",
+          "visibleFocus": true
+        },
+        {
+          "tag": "BUTTON",
+          "role": null,
+          "type": "submit",
+          "href": null,
+          "text": "Sign In",
+          "visibleFocus": true
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "type": null,
+          "href": "http://127.0.0.1:3000/register",
+          "text": "Create one",
+          "visibleFocus": true
+        },
+        {
+          "tag": "NEXTJS-PORTAL",
+          "role": null,
+          "type": null,
+          "href": null,
+          "text": "",
+          "visibleFocus": false
+        },
+        {
+          "tag": "BODY",
+          "role": null,
+          "type": null,
+          "href": null,
+          "text": "Sign In\nCancel\nEmail\nPa word\nSign In\n\nDon't have an account? Create one",
+          "visibleFocus": false
+        },
+        {
+          "tag": "A",
+          "role": null,
+          "type": null,
+          "href": "http://127.0.0.1:3000/",
+          "text": "Cancel",
+          "visibleFocus": true
+        }
+      ],
+      "invalidFirstCycleCount": 0,
+      "pass": true
+    }
+  ],
+  "accessibility": [
+    {
+      "route": "/",
+      "nodeCount": 4731,
+      "headings": [
+        "Global hiring intelligence",
+        "Select a job or company signal",
+        "Global hiring demand",
+        "Accessible job list"
+      ],
+      "landmarks": [
+        {
+          "role": "main",
+          "name": ""
+        }
+      ],
+      "emptyInteractive": [],
+      "pass": true
+    },
+    {
+      "route": "/privacy",
+      "nodeCount": 128,
+      "headings": [
+        "Job Globe Privacy Notice",
+        "Data The App Currently Handles",
+        "Resume Handling",
+        "Current Limits",
+        "User Controls Available Now"
+      ],
+      "landmarks": [
+        {
+          "role": "main",
+          "name": ""
+        }
+      ],
+      "emptyInteractive": [],
+      "pass": true
+    },
+    {
+      "route": "/login",
+      "nodeCount": 52,
+      "headings": [
+        "Sign In"
+      ],
+      "landmarks": [
+        {
+          "role": "main",
+          "name": ""
+        }
+      ],
+      "emptyInteractive": [],
+      "pass": true
+    }
+  ],
+  "performance": [
+    {
+      "route": "/",
+      "navigation": {
+        "domContentLoadedMs": 103,
+        "loadEventMs": 127,
+        "transferSizeBytes": 5833,
+        "encodedBodySizeBytes": 5533,
+        "firstPaintMs": 236,
+        "firstContentfulPaintMs": 236
+      },
+      "jsHeapUsedBytes": 33390244,
+      "taskDurationMs": 343,
+      "pass": true
+    },
+    {
+      "route": "/privacy",
+      "navigation": {
+        "domContentLoadedMs": 102,
+        "loadEventMs": 149,
+        "transferSizeBytes": 5347,
+        "encodedBodySizeBytes": 5047,
+        "firstPaintMs": 112,
+        "firstContentfulPaintMs": 112
+      },
+      "jsHeapUsedBytes": 37274132,
+      "taskDurationMs": 69,
+      "pass": true
+    }
+  ],
+  "pass": true
+}

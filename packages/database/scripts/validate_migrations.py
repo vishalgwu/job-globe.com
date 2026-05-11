@@ -18,6 +18,7 @@ EXPECTED_FILES = [
     "011_audit_events.sql",
     "012_job_time_filter_indexes.sql",
     "013_profiles_preferences.sql",
+    "014_resume_extractions_user_unique.sql",
 ]
 EXPECTED_TABLES = {
     "users", "auth_sessions", "profiles", "resume_extractions", "companies", "locations",
@@ -49,7 +50,10 @@ def main(migrations_dir: str) -> int:
     if "idx_jobs_canonical_status_first_seen_at" not in sql:
         print("Expected jobs_canonical time-filter index is missing")
         return 1
-    print("Migration validation passed: 13 files, 17 tables, pgvector, and GIN indexes present.")
+    if "idx_resume_extractions_user_unique" not in sql:
+        print("Expected resume_extractions user uniqueness index is missing")
+        return 1
+    print("Migration validation passed: 14 files, 17 tables, pgvector, GIN indexes, and resume uniqueness present.")
     return 0
 
 

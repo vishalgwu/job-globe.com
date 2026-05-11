@@ -53,7 +53,8 @@ docs/
 - Supabase Storage resume upload, signed URL read, and raw object delete.
 - Application redirects are recorded through `POST /api/applications` before the Apply CTA opens the external URL.
 - Audit-event writes exist for selected high-risk user and worker actions.
-- PostgreSQL schema with 13 migrations, 17 application tables, pgvector, indexes, taxonomy seed, and demo job seed.
+- PostgreSQL schema with 14 migrations, 17 application tables, pgvector, indexes, taxonomy seed, and demo job seed.
+- Staging Supabase health, private `resumes` storage bucket, authenticated user flow, audit rows, and basic browser QA evidence were confirmed for controlled demos on 2026-05-11.
 - Python worker package with discovery, verification, company identity, geo mapping, taxonomy tagging, canonical upsert, Redis helpers, and DB repositories.
 - Source connector classes for Greenhouse, Lever, Adzuna, USAJOBS, EURES, Workable, and SmartRecruiters.
 - Docker Compose for local Postgres, Redis, web, and workers.
@@ -152,4 +153,4 @@ The active worker package lives under `apps/workers/src/job_globe_workers`. The 
 
 ## Current State
 
-The architecture is a working foundation, not a production launch system. The web app, API layer, schema, and worker pipeline code are present. The planned AI, alerting, privacy self-service, infrastructure, and observability layers are incomplete.
+The architecture is a working foundation, not a production launch system. The web app, API layer, schema, staging Supabase configuration, and worker pipeline code are present. The planned AI, alerting, privacy self-service, infrastructure, and observability layers are incomplete.

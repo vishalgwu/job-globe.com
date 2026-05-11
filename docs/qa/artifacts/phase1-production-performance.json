@@ -1,0 +1,37 @@
+{
+  "capturedAt": "2026-05-11T01:39:12.305Z",
+  "baseUrl": "http://127.0.0.1:3001",
+  "server": "next start production build with staging Supabase env",
+  "chrome": "Chrome/147.0.7727.138",
+  "performance": [
+    {
+      "route": "/",
+      "navigation": {
+        "domContentLoadedMs": 77,
+        "loadEventMs": 124,
+        "transferSizeBytes": 3805,
+        "encodedBodySizeBytes": 3505,
+        "firstPaintMs": 136,
+        "firstContentfulPaintMs": 136
+      },
+      "jsHeapUsedBytes": 4070464,
+      "taskDurationMs": 232,
+      "pass": true
+    },
+    {
+      "route": "/privacy",
+      "navigation": {
+        "domContentLoadedMs": 20,
+        "loadEventMs": 34,
+        "transferSizeBytes": 3045,
+        "encodedBodySizeBytes": 2745,
+        "firstPaintMs": 52,
+        "firstContentfulPaintMs": 52
+      },
+      "jsHeapUsedBytes": 5156620,
+      "taskDurationMs": 31,
+      "pass": true
+    }
+  ],
+  "pass": true
+}

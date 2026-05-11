@@ -42,8 +42,9 @@ Supabase Auth/Storage -> protected user and resume workflows
 - Selected audit-event writes exist for high-risk user actions and worker failures.
 - Active worker package with discovery, verification, company identity, geo mapping, taxonomy tagging, canonical job upsert, Redis helpers, and DB repositories.
 - Seven source connector classes: Greenhouse, Lever, Adzuna, USAJOBS, EURES, Workable, and SmartRecruiters.
-- 13 database migrations, 17 application tables, pgvector, taxonomy seed, and demo job seed.
+- 14 database migrations, 17 application tables, pgvector, taxonomy seed, demo job seed, and resume one-row-per-user uniqueness.
 - Local web tests, worker mypy, worker pytest, and migration validation.
+- Phase 1 controlled-demo evidence for staging Supabase health, authenticated flow, audit rows, mobile screenshots, keyboard traversal, accessibility tree, and basic performance timing.
 
 ## Frontend
 
@@ -153,7 +154,7 @@ In progress or missing:
 
 ## Remaining Work
 
-- Phase 1: staging Supabase confirmation plus browser, keyboard, screen-reader, and basic performance QA evidence.
+- Phase 1 controlled-demo gate is complete; remaining launch work is legal/privacy approval, human screen-reader testing, security review, and broader production QA.
 - Phase 2: resume parsing, profile correction UI, embeddings, semantic matching, generated quick prep, alert delivery, webhooks, Redis consumer groups/retries/dead letters.
 - Phase 3: production worker deployment, real infrastructure, observability, runbooks, load tests, replay tests, backup/restore, rollback, and security review evidence.
 

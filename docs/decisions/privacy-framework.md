@@ -6,6 +6,14 @@ Draft reference for implementation. It is not a legal sign-off.
 
 This document reflects the current codebase and the remaining privacy work needed before launch.
 
+## Controlled Demo Decision
+
+Decision on 2026-05-11:
+
+- The current draft `/privacy` route is enough for controlled demos.
+- It is not enough for public launch, broad beta, or unsupervised handling of real resume data at scale.
+- Before launch, the route should either be reviewed and approved as the product privacy policy or replaced with a reviewed external/legal policy URL.
+
 ## Data Currently Represented In Code
 
 - Account data: email, Supabase provider subject, role, display name, timestamps.
@@ -73,6 +81,12 @@ Current integrations in code:
 
 - Supabase for auth, database, and resume storage.
 - Redis/PostgreSQL for workers when running locally or in deployed worker infrastructure.
+
+Current staging configuration confirmed on 2026-05-11:
+
+- Supabase auth, jobs, migrations, and storage health checks pass.
+- Private Supabase Storage bucket `resumes` exists.
+- `resume_extractions.user_id` is unique so the resume API can maintain one current raw resume record per user.
 
 Planned but not fully active:
 

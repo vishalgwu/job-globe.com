@@ -45,21 +45,22 @@ The repository has a working foundation, web experience, API layer, schema, and 
 | Audit events     | Selected audit writes exist for profile updates, resume upload/delete, saved jobs, application redirects, alert create/delete, and worker failures.                                                                                             |
 | Workers          | Active package under `apps/workers/src/job_globe_workers` includes discovery, source connectors, verification, company identity, geo mapping, taxonomy tagging, duplicate/canonical upsert, Redis helpers, DB repositories, and health logging. |
 | Worker cleanup   | Earlier top-level worker placeholder folders were removed; active worker code now lives under `apps/workers/src/job_globe_workers`.                                                                                                             |
-| Database         | 13 migrations define the expected 17 application tables plus indexes, pgvector support, taxonomy seeds, and demo job seeds.                                                                                                                     |
+| Database         | 14 migrations define the expected 17 application tables plus indexes, pgvector support, taxonomy seeds, demo job seeds, and one-current-resume-row-per-user invariant.                                                                          |
 | CI coverage      | GitHub Actions defines web, worker, and database checks.                                                                                                                                                                                        |
+| Phase 1 QA       | Staging Supabase health, authenticated profile/resume/save/apply/alert flow, audit rows, private resume bucket, mobile screenshots, keyboard traversal, accessibility tree, and basic performance timing are recorded for controlled demos.     |
 
 ## In Progress
 
-| Area               | Implemented part                                                                                                   | Missing part                                                                                                                                                                                                              |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Globe UX           | Main experience, filters, list fallback, panel, and pages exist.                                                   | `IntroOverlay` is not wired into the main page; active globe implementation does not use Globe.GL/deck.gl heatmap layers despite dependencies being installed; launch accessibility/performance evidence is not recorded. |
-| Pipeline           | Worker code and tests exist for the main ingestion/enrichment pipeline.                                            | No evidence in repo that live staging ingestion is running from three sources; no webhook receiver, Redis consumer groups, dead-letter queue, or source rate-limit bucket implementation.                                 |
-| Matching           | Rule-based match scoring and UI breakdown exist; optional embedding-score blending is supported by pure functions. | Job/profile embedding generation and pgvector retrieval are not active. The planned 7-component scorer is not implemented.                                                                                                |
-| Resume             | Upload/storage/delete routes exist.                                                                                | Worker resume extraction only reads `.txt`; PDF/DOCX parsing, profile normalisation, confidence review UI, and automated raw-file deletion job are missing.                                                               |
-| Alerts             | Alert CRUD and active-alert cap exist.                                                                             | Background alert evaluation, email delivery, digest bundling, and in-app notification feed are missing.                                                                                                                   |
-| Applications       | API, page, and Apply CTA recording exist.                                                                          | Application status lifecycle beyond `redirected` is not implemented.                                                                                                                                                      |
-| Privacy/compliance | Resume consent copy, draft `/privacy` route, selected audit writes, and resume retention fields exist.             | Delete/export/correction flows, audit administration, audit retention policy, and legal/privacy sign-off are not implemented.                                                                                             |
-| Infrastructure     | Docker Compose, Dockerfiles, CI, and Vercel handoff files exist.                                                   | Terraform is placeholder-only; staging deploy workflow is a placeholder; production worker deployment is not defined.                                                                                                     |
+| Area               | Implemented part                                                                                                   | Missing part                                                                                                                                                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Globe UX           | Main experience, filters, list fallback, panel, and pages exist.                                                   | `IntroOverlay` is not wired into the main page; active globe implementation does not use Globe.GL/deck.gl heatmap layers despite dependencies being installed; full launch accessibility/performance evidence is not complete. |
+| Pipeline           | Worker code and tests exist for the main ingestion/enrichment pipeline.                                            | No evidence in repo that live staging ingestion is running from three sources; no webhook receiver, Redis consumer groups, dead-letter queue, or source rate-limit bucket implementation.                                      |
+| Matching           | Rule-based match scoring and UI breakdown exist; optional embedding-score blending is supported by pure functions. | Job/profile embedding generation and pgvector retrieval are not active. The planned 7-component scorer is not implemented.                                                                                                     |
+| Resume             | Upload/storage/delete routes exist.                                                                                | Worker resume extraction only reads `.txt`; PDF/DOCX parsing, profile normalisation, confidence review UI, and automated raw-file deletion job are missing.                                                                    |
+| Alerts             | Alert CRUD and active-alert cap exist.                                                                             | Background alert evaluation, email delivery, digest bundling, and in-app notification feed are missing.                                                                                                                        |
+| Applications       | API, page, and Apply CTA recording exist.                                                                          | Application status lifecycle beyond `redirected` is not implemented.                                                                                                                                                           |
+| Privacy/compliance | Resume consent copy, draft `/privacy` route, selected audit writes, and resume retention fields exist.             | Delete/export/correction flows, audit administration, audit retention policy, and legal/privacy sign-off are not implemented.                                                                                                  |
+| Infrastructure     | Docker Compose, Dockerfiles, CI, and Vercel handoff files exist.                                                   | Terraform is placeholder-only; staging deploy workflow is a placeholder; production worker deployment is not defined.                                                                                                          |
 
 ## Not Implemented
 
@@ -73,11 +74,11 @@ The repository has a working foundation, web experience, API layer, schema, and 
 - Self-service account delete, data export, and profile correction.
 - Complete audit administration, reporting, retention policy, and coverage beyond the Phase 1 audit events.
 - Production-grade Terraform/cloud infrastructure.
-- Recorded launch QA: Lighthouse, keyboard, screen reader, mobile devices, security review, and load tests.
+- Full launch QA: Lighthouse, human screen-reader pass, real mobile devices, security review, and load tests.
 
 ## Remaining Work
 
-Phase 1 has closed the local consistency blockers for privacy target, application-click tracking, selected audit-event writes, legacy placeholder cleanup, and basic local browser smoke evidence. Remaining Phase 1 work is staging Supabase confirmation plus manual keyboard, screen-reader, mobile, and production performance QA evidence.
+Phase 1 has closed the controlled-demo blockers for privacy target, application-click tracking, selected audit-event writes, legacy placeholder cleanup, staging Supabase health, authenticated flow evidence, audit-row confirmation, private resume bucket setup, and basic browser/mobile/accessibility/performance smoke evidence. Remaining launch work is legal/privacy sign-off, human screen-reader testing, security review, and broader production QA.
 
 Phase 2 should implement planned product expansion: resume parsing, embeddings, semantic matching, generated quick prep, alert evaluator/delivery, webhook receivers, and robust Redis processing.
 
@@ -103,6 +104,7 @@ Commands verified locally during this Phase 1 pass:
 
 ```powershell
 npm run test --workspace=apps/web
+.\.venv-job-globe\Scripts\python.exe -m ruff check apps/workers
 .\.venv-job-globe\Scripts\python.exe -m mypy apps/workers/src
 .\.venv-job-globe\Scripts\python.exe -m pytest apps/workers/tests
 .\.venv-job-globe\Scripts\python.exe packages/database/scripts/validate_migrations.py packages/database/migrations
@@ -113,4 +115,4 @@ Results on 2026-05-11:
 - Web tests: 5 files, 48 tests passed.
 - Worker mypy: 45 source files passed.
 - Worker pytest: 86 tests passed.
-- Migration validation: 13 files, 17 tables, pgvector, and GIN indexes present.
+- Migration validation: 14 files, 17 tables, pgvector, GIN indexes, and resume uniqueness present.

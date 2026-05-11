@@ -4,18 +4,18 @@ This gap analysis compares the implemented codebase against the reference plan i
 
 ## Feature Gaps
 
-| Feature              | Current code                                                                                    | Gap                                                                                                                            |
-| -------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Globe rendering      | Active React/CSS globe and fallback map exist.                                                  | Planned Globe.GL/deck.gl heatmap implementation is not active.                                                                 |
-| Immersive intro      | `IntroOverlay` component exists.                                                                | It is not wired into the main page; audio/mute persistence is not implemented.                                                 |
-| Application tracking | API, `/applications` page, and Apply CTA redirect recording exist.                              | Application lifecycle beyond `redirected` is not implemented.                                                                  |
-| Resume parsing       | Upload, metadata, signed URL, and delete routes exist.                                          | PDF/DOCX parsing, structured extraction, confidence scoring, correction UI, and automated retention deletion are missing.      |
-| Match scoring        | Rule-based scorer exists and can blend a supplied embedding score.                              | No embedding generation, pgvector retrieval, 7-component scoring engine, or calibration workflow is active.                    |
-| Quick prep           | UI renders quick-prep fields from job detail.                                                   | No OpenAI generation or 24-hour per-user/job cache exists.                                                                     |
-| Alerts               | CRUD routes and alerts page exist.                                                              | No scheduled evaluator, email delivery, digest bundling, or notification feed exists.                                          |
-| Worker ingestion     | Connectors and pipeline workers are implemented in package code.                                | No repo evidence of live staging ingestion, webhook receiver, Redis consumer groups, dead-letter queue, or rate-limit buckets. |
-| Privacy controls     | Consent copy, draft `/privacy` route, raw resume delete route, and selected audit writes exist. | Delete account, data export, parsed-profile correction, audit administration, and legal sign-off are missing.                  |
-| Infrastructure       | Docker and CI exist.                                                                            | Terraform, staging deploy automation, production worker hosting, rollback docs, and observability dashboards are missing.      |
+| Feature              | Current code                                                                                                                   | Gap                                                                                                                            |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| Globe rendering      | Active React/CSS globe and fallback map exist.                                                                                 | Planned Globe.GL/deck.gl heatmap implementation is not active.                                                                 |
+| Immersive intro      | `IntroOverlay` component exists.                                                                                               | It is not wired into the main page; audio/mute persistence is not implemented.                                                 |
+| Application tracking | API, `/applications` page, and Apply CTA redirect recording exist.                                                             | Application lifecycle beyond `redirected` is not implemented.                                                                  |
+| Resume parsing       | Upload, metadata, signed URL, and delete routes exist.                                                                         | PDF/DOCX parsing, structured extraction, confidence scoring, correction UI, and automated retention deletion are missing.      |
+| Match scoring        | Rule-based scorer exists and can blend a supplied embedding score.                                                             | No embedding generation, pgvector retrieval, 7-component scoring engine, or calibration workflow is active.                    |
+| Quick prep           | UI renders quick-prep fields from job detail.                                                                                  | No OpenAI generation or 24-hour per-user/job cache exists.                                                                     |
+| Alerts               | CRUD routes and alerts page exist.                                                                                             | No scheduled evaluator, email delivery, digest bundling, or notification feed exists.                                          |
+| Worker ingestion     | Connectors and pipeline workers are implemented in package code.                                                               | No repo evidence of live staging ingestion, webhook receiver, Redis consumer groups, dead-letter queue, or rate-limit buckets. |
+| Privacy controls     | Consent copy, draft `/privacy` route, raw resume delete route, selected audit writes, and private staging resume bucket exist. | Delete account, data export, parsed-profile correction, audit administration, and legal sign-off are missing.                  |
+| Infrastructure       | Docker and CI exist.                                                                                                           | Terraform, staging deploy automation, production worker hosting, rollback docs, and observability dashboards are missing.      |
 
 ## Missing Components
 
@@ -29,7 +29,7 @@ This gap analysis compares the implemented codebase against the reference plan i
 - Redis consumer groups, message acknowledgement, retries, and dead-letter queue handling.
 - Production worker deployment definition.
 - Real Terraform/cloud infrastructure.
-- Launch QA artifacts.
+- Full launch QA artifacts beyond the Phase 1 controlled-demo smoke evidence.
 
 ## Technical Debt
 
@@ -56,16 +56,23 @@ Goal: make the current product internally consistent, privacy-safe enough for co
 
 Tasks:
 
-- Confirm Supabase environment variables and auth/session behavior in staging.
-- Complete manual keyboard, screen-reader, mobile, and production performance QA evidence.
-- Keep web tests, worker mypy, worker pytest, and migration validation green.
-- Decide whether the draft `/privacy` route is enough for controlled demos or must point to an externally reviewed policy.
+- Completed for controlled demos on 2026-05-11:
+  - Confirmed required Supabase environment variables and auth/session behavior.
+  - Applied missing staging migrations and added `014_resume_extractions_user_unique.sql`.
+  - Created private staging `resumes` storage bucket.
+  - Completed authenticated profile, resume upload/delete, save job, apply record, alert create/delete, and audit-row confirmation.
+  - Captured keyboard traversal, accessibility tree, mobile viewport screenshots, and basic performance timing.
+  - Decided the current draft `/privacy` route is acceptable for controlled demos only.
+- Remaining before public launch:
+  - Human screen-reader pass.
+  - Legal/privacy approval or replacement with a reviewed external policy.
+  - Security review and broader production QA.
 
 Dependencies:
 
-- Supabase staging project and service-role configuration.
-- Product/legal decision on whether `/privacy` should remain an app page or become an external policy URL.
-- Manual QA owner for keyboard, screen-reader, mobile, and production performance evidence.
+- Legal/privacy reviewer.
+- Security review owner.
+- Production QA owner for full Lighthouse, real-device, load, and accessibility sign-off.
 
 ### Phase 2 - Feature Expansion
 
@@ -116,7 +123,7 @@ Dependencies:
 
 ## Clear Next Steps
 
-1. Confirm staging Supabase variables, `/api/health`, and `/api/auth/session`.
-2. Complete manual keyboard, screen-reader, mobile, and production performance QA evidence.
-3. Decide alert delivery scope for the next release.
-4. Start resume parsing only after privacy copy and data-processing scope are approved.
+1. Run human screen-reader and legal/privacy review before any public launch.
+2. Decide alert delivery scope for the next release.
+3. Start resume parsing only after privacy copy and data-processing scope are approved.
+4. Plan production worker deployment, observability, and rollback evidence.
