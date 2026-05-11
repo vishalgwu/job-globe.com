@@ -69,5 +69,5 @@ jobs:
             from information_schema.tables
             where table_schema = 'public'
               and table_name <> 'schema_migrations';
-          " | grep 17
-      - run: psql "$DATABASE_URL" -tAc "select count(*) from schema_migrations;" | grep 13
+          " | grep -qx 21
+      - run: psql "$DATABASE_URL" -tAc "select count(*) from schema_migrations;" | grep -qx 16

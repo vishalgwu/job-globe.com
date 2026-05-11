@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import structlog
+from openai import OpenAI  # type: ignore[import-untyped]
 
 logger = structlog.get_logger(__name__)
 
@@ -143,8 +144,6 @@ def extract_structured_profile(
     Returns the profile dict plus a 'confidence' key with per-field scores.
     Handles JSON parse errors gracefully by returning partial/empty fields.
     """
-    from openai import OpenAI  # type: ignore[import-untyped]
-
     client = OpenAI(api_key=openai_api_key)
 
     # Truncate to avoid token limits (~12k chars ~= ~3k tokens)

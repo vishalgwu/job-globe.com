@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
@@ -156,7 +156,7 @@ def evaluate_alert(alert_row: dict[str, Any], pool: ConnectionPool) -> int:
         "required_skills", "salary_min", "salary_max", "currency",
         "company_id", "location_id",
     ]
-    jobs = [dict(zip(col_names, r)) for r in rows]
+    jobs = [dict(zip(col_names, r, strict=True)) for r in rows]
 
     # Score and filter
     matches: list[dict[str, Any]] = []
@@ -188,7 +188,7 @@ def evaluate_alert(alert_row: dict[str, Any], pool: ConnectionPool) -> int:
         return 0
 
     # Insert deliveries + notifications
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     for match in new_matches:
         job_id = str(match["id"])
         match_score = match["_match_score"]
@@ -324,7 +324,7 @@ def run_alert_evaluator_loop(stop_event: threading.Event) -> None:
                 "id", "user_id", "name", "query", "minimum_match_score",
                 "delivery_channels", "last_evaluated_at",
             ]
-            alerts = [dict(zip(col_names, r)) for r in alert_rows]
+            alerts = [dict(zip(col_names, r, strict=True)) for r in alert_rows]
 
             total_matches = 0
             for alert in alerts:

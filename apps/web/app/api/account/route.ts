@@ -25,11 +25,11 @@ export async function DELETE(request: NextRequest) {
     }
   }
 
-  // Step 2: Delete job_applications
+  // Step 2: Delete applications
   {
-    const { error } = await supabase.from("job_applications").delete().eq("user_id", user.id);
+    const { error } = await supabase.from("applications").delete().eq("user_id", user.id);
     if (error) {
-      console.error("[account/delete] job_applications delete failed:", error.message);
+      console.error("[account/delete] applications delete failed:", error.message);
       return NextResponse.json({ error: "Failed to delete account data." }, { status: 500 });
     }
   }
@@ -152,14 +152,14 @@ export async function GET(request: NextRequest) {
       profilesResult,
       resumeExtractionsResult,
       savedJobsResult,
-      jobApplicationsResult,
+      applicationsResult,
       alertsResult,
       notificationsResult,
     ] = await Promise.all([
       supabase.from("profiles").select("*").eq("user_id", user.id),
       supabase.from("resume_extractions").select("*").eq("user_id", user.id),
       supabase.from("saved_jobs").select("*").eq("user_id", user.id),
-      supabase.from("job_applications").select("*").eq("user_id", user.id),
+      supabase.from("applications").select("*").eq("user_id", user.id),
       supabase
         .from("alerts")
         .select("id, name, query, minimum_match_score, delivery_channels, active, last_evaluated_at, created_at")
@@ -178,7 +178,8 @@ export async function GET(request: NextRequest) {
         typeof row.parsed_profile === "object" &&
         !Array.isArray(row.parsed_profile)
       ) {
-        const { rawText: _omit, ...rest } = row.parsed_profile as Record<string, unknown>;
+        const rest = { ...(row.parsed_profile as Record<string, unknown>) };
+        delete rest.rawText;
         return { ...row, parsed_profile: rest };
       }
       return row;
@@ -196,7 +197,7 @@ export async function GET(request: NextRequest) {
       profiles: profilesResult.data ?? [],
       resume_extractions: resumeExtractions,
       saved_jobs: savedJobsResult.data ?? [],
-      job_applications: jobApplicationsResult.data ?? [],
+      applications: applicationsResult.data ?? [],
       alerts: alertsResult.data ?? [],
       notifications: notificationsResult.data ?? [],
     });

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -14,7 +13,6 @@ from job_globe_workers.parsers.resume_extractor import (
     extract_resume_text,
     extract_structured_profile,
 )
-
 
 # ── extract_resume_text ────────────────────────────────────────────────────
 

@@ -53,7 +53,11 @@ def _build_profile_text(row: Any) -> str:
     elif isinstance(preferences_raw, str):
         try:
             parsed = json.loads(preferences_raw)
-            pref_parts = [f"{k}: {v}" for k, v in parsed.items()] if isinstance(parsed, dict) else []
+            pref_parts = (
+                [f"{k}: {v}" for k, v in parsed.items()]
+                if isinstance(parsed, dict)
+                else []
+            )
         except (json.JSONDecodeError, ValueError):
             pref_parts = []
     else:

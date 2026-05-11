@@ -52,14 +52,29 @@ def build_email_html(
         if salary_min or salary_max:
             lo = f"{salary_min:,}" if salary_min else "?"
             hi = f"{salary_max:,}" if salary_max else "?"
-            salary_str = f"<p style='margin:4px 0;color:#555;font-size:13px;'>Salary: {currency} {lo}–{hi}</p>"
+            salary_str = (
+                "<p style='margin:4px 0;color:#555;font-size:13px;'>"
+                f"Salary: {currency} {lo}&ndash;{hi}</p>"
+            )
+
+        company_html = (
+            f"<p style='margin:4px 0;color:#666;font-size:13px;'>{company}</p>"
+            if company
+            else ""
+        )
+        location_html = (
+            f"<p style='margin:4px 0;color:#666;font-size:13px;'>&#128205; {location}</p>"
+            if location
+            else ""
+        )
 
         job_rows.append(
             f"""
-            <div style='border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-bottom:16px;'>
+            <div style='border:1px solid #e0e0e0;border-radius:8px;
+                        padding:16px;margin-bottom:16px;'>
               <h3 style='margin:0 0 4px 0;font-size:16px;color:#1a1a1a;'>{title}</h3>
-              {"<p style='margin:4px 0;color:#666;font-size:13px;'>" + company + "</p>" if company else ""}
-              {"<p style='margin:4px 0;color:#666;font-size:13px;'>📍 " + location + "</p>" if location else ""}
+              {company_html}
+              {location_html}
               {salary_str}
               <p style='margin:4px 0;color:#888;font-size:12px;'>Match score: {score_pct}%</p>
               <a href='{safe_url}'

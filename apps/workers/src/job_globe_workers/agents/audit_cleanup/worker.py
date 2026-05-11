@@ -73,7 +73,10 @@ def apply_retention_policies(pool: Any) -> int:
         matched_policy: dict[str, Any] | None = None
         for policy in policies:
             if fnmatch.fnmatch(event_type, policy["glob"]):
-                if matched_policy is None or policy["retention_days"] < matched_policy["retention_days"]:
+                if (
+                    matched_policy is None
+                    or policy["retention_days"] < matched_policy["retention_days"]
+                ):
                     matched_policy = policy
 
         if matched_policy is None:

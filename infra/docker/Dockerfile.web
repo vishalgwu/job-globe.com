@@ -24,7 +24,6 @@ ENV NODE_ENV=production \
 
 # Copy installed modules from the deps stage
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules 2>/dev/null || true
 
 # Copy the full source tree (needed by the Next.js build)
 COPY . .
