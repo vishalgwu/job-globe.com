@@ -230,3 +230,5 @@ out/
 *.tsbuildinfo
 pytest-cache-files-*/
 Anusha_Umashankar.pdf
+
+.vercel
