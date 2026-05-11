@@ -29,13 +29,16 @@ Job listings are scattered across company career sites, ATS-hosted boards, gover
 
 ## Not Yet Implemented
 
+- `IntroOverlay` component exists but is not wired into the main globe page.
+- `useAlerts()` and `useMatchScore()` hooks are empty stubs — they return `{}` and have no real implementation.
 - Background alert evaluation, in-app notification feed, and email delivery.
-- Resume PDF/DOCX parsing and structured profile extraction.
+- Resume PDF/DOCX parsing and structured profile extraction (only `.txt` is handled; PDF/DOCX raises `NotImplementedError`).
 - Job/profile embedding generation and pgvector-backed semantic matching.
 - Generated quick-prep content and caching.
 - Account deletion, data export, and parsed-profile correction.
 - Complete audit administration, retention policy, and reporting.
-- Production worker deployment and real Terraform infrastructure.
+- Redis consumer groups, message acknowledgement, retries, and dead-letter queue handling.
+- Production worker deployment and real Terraform infrastructure (placeholder only).
 - Full launch QA, load testing, legal/privacy review, and security review evidence.
 
 ## Tech Stack
@@ -165,15 +168,21 @@ Current state: working foundation with a functional web app, API layer, database
 
 ### Phase 2 - Feature Expansion
 
-- Implement resume parsing, structured extraction, confidence review, and correction UI.
-- Implement embeddings and pgvector-backed candidate retrieval.
+- Wire `IntroOverlay` into the main globe page.
+- Implement `useAlerts()` and `useMatchScore()` hooks with real data.
+- Implement resume PDF/DOCX parsing, structured extraction, confidence scoring, and correction UI.
+- Generate and store job/profile embeddings; activate pgvector-backed semantic matching.
 - Generate and cache quick-prep content.
-- Add alert evaluation, in-app notifications, and email delivery.
+- Build alert evaluator, in-app notification feed, and email delivery.
 - Add webhook receivers, source rate-limit handling, Redis consumer groups, retries, and dead-letter queues.
+- Implement account deletion, data export, and parsed-profile correction.
 
 ### Phase 3 - Optimization And Scaling
 
 - Define production worker deployment and rollback process.
 - Replace placeholder Terraform with real infrastructure or remove it from scope.
-- Add tracing, dashboards, runbooks, load tests, replay tests, and security review evidence.
+- Add OpenTelemetry tracing, operational dashboards, runbooks, backup/restore procedures.
+- Load test job queries and run worker replay tests.
 - Calibrate matching from human review and behavioral signals.
+
+For a numbered step-by-step breakdown, see `docs/md/project-gap-analysis.md`.

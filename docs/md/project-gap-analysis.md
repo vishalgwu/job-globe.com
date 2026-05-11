@@ -50,80 +50,110 @@ This gap analysis compares the implemented codebase against the reference plan i
 
 ### Phase 1 - Critical Completion
 
-Priority: P0/P1.
+Phase 1 controlled-demo gate closed on 2026-05-10. Remaining before any public launch:
 
-Goal: make the current product internally consistent, privacy-safe enough for controlled demos, and CI-stable.
+- Human screen-reader pass (no automated substitute).
+- Legal/privacy policy approval or replacement with a reviewed external policy (the current `/privacy` route is a draft).
+- Security review sign-off.
+- Broader production QA: Lighthouse budgets, real mobile devices, load baseline.
 
-Tasks:
-
-- Completed for controlled demos on 2026-05-11:
-  - Confirmed required Supabase environment variables and auth/session behavior.
-  - Applied missing staging migrations and added `014_resume_extractions_user_unique.sql`.
-  - Created private staging `resumes` storage bucket.
-  - Completed authenticated profile, resume upload/delete, save job, apply record, alert create/delete, and audit-row confirmation.
-  - Captured keyboard traversal, accessibility tree, mobile viewport screenshots, and basic performance timing.
-  - Decided the current draft `/privacy` route is acceptable for controlled demos only.
-- Remaining before public launch:
-  - Human screen-reader pass.
-  - Legal/privacy approval or replacement with a reviewed external policy.
-  - Security review and broader production QA.
-
-Dependencies:
-
-- Legal/privacy reviewer.
-- Security review owner.
-- Production QA owner for full Lighthouse, real-device, load, and accessibility sign-off.
+Dependencies: legal/privacy reviewer, security review owner, production QA owner.
 
 ### Phase 2 - Feature Expansion
 
-Priority: P1/P2.
+Goal: activate the AI, alert, and privacy self-service features that are currently schema or UI placeholders.
 
-Goal: implement the planned AI and alert features that are currently schema/UI placeholders.
-
-Tasks:
-
-- Build resume parsing worker for PDF/DOCX/TXT and store structured extraction with confidence values.
-- Add user correction UI for parsed profile fields.
-- Generate and store job/profile embeddings.
-- Implement pgvector candidate retrieval and the planned 7-component scoring formula.
-- Replace placeholder quick-prep content with generated/cached content.
-- Implement alert evaluator, in-app notifications, email delivery, daily caps, and digest bundling.
-- Add webhook receivers and source-specific rate-limit handling.
-- Add Redis consumer groups, acknowledgements, retries, and dead-letter queue handling.
-
-Dependencies:
-
-- OpenAI key/model decision and privacy approval for prompt data scope.
-- Transactional email provider.
-- Worker deployment target with Redis/PostgreSQL access.
-- Source credentials for the selected live connectors.
+Phase 2 is blocked until Phase 1 legal/privacy approval is complete for resume and profile data handling.
 
 ### Phase 3 - Optimization And Scaling
 
-Priority: P2/P3.
+Goal: production-grade infrastructure, observability, and launch hardening.
 
-Goal: make the system measurable, scalable, and launch-ready.
+---
 
-Tasks:
+## Step-By-Step Remaining Work Plan
 
-- Replace Terraform placeholders with real modules or remove Terraform from the active infrastructure story.
-- Define production worker deployment and rollback process.
-- Add OpenTelemetry or equivalent distributed tracing across web and workers.
-- Build internal KPI/admin dashboard.
-- Add load tests for job queries and worker replay tests.
-- Add backup/restore and incident response runbooks.
-- Complete mobile/device QA, Lighthouse budgets, accessibility reports, and security testing.
-- Calibrate match scoring from behavioral signals and human review sets.
+This plan is derived directly from code gaps confirmed on 2026-05-10. Items are ordered by dependency and risk.
 
-Dependencies:
+### Step 1 — Pre-Launch Blockers (P0)
 
-- Production hosting choices for web, workers, Redis, Postgres, storage, and observability.
-- Real usage data or a representative staging replay dataset.
-- Security/privacy review owner.
+These must be resolved before any public traffic:
+
+- Conduct human screen-reader accessibility pass on the full web app flow.
+- Obtain legal/privacy sign-off on the `/privacy` policy and resume data handling scope.
+- Complete security review covering auth routes, Supabase RLS, Storage bucket policy, and worker egress.
+- Wire `IntroOverlay` component (`apps/web/components/globe/IntroOverlay/IntroOverlay.tsx`) into `GlobeExperience` — it is built but not imported anywhere.
+
+### Step 2 — Technical Debt Cleanup (P1)
+
+Fix stubs and placeholders that break the user-facing product silently:
+
+- Implement `useAlerts()` hook (`apps/web/hooks/useAlerts.ts`) — currently `return {}`.
+- Implement `useMatchScore()` hook (`apps/web/hooks/useMatchScore.ts`) — currently `return {}`.
+- Replace `packages/shared-types/python/profile.py` and `match.py` placeholder strings with real Pydantic models matching the TypeScript contracts in `packages/shared-types/typescript/`.
+- Connect `deploy-staging.yml` to a real staging platform and remove the echo-only placeholder step.
+- Remove or replace Terraform placeholder files (`infra/terraform/main.tf` is a single `# TODO` comment). Either add real modules or delete the directory and update docs accordingly.
+
+### Step 3 — Resume Parsing Worker (P1, requires Step 1 legal approval)
+
+- Extend `apps/workers/src/job_globe_workers/parsers/resume_extractor.py` to handle PDF (via `pypdfium2`, already installed) and DOCX (via `python-docx`).
+- Build a structured extraction layer that produces a normalised profile object (skills, title, seniority, locations) with per-field confidence values.
+- Store extraction results in the `resume_extractions` table (migration 014 already enforces one row per user).
+- Add user-facing correction UI for parsed profile fields in `apps/web/app/(profile)/profile/`.
+- Add an automated raw-file deletion job after the retention window expires.
+
+### Step 4 — Embeddings And Semantic Matching (P1, requires Step 3)
+
+- Build an embedding generation job in `apps/workers/src/job_globe_workers/` that writes vectors to `job_embeddings` and `profile_embeddings` (both tables exist in migrations 007).
+- Implement pgvector ANN retrieval in `apps/web/lib/match/scorer.ts` — the cosine blend path is already coded but the embedding rows are never populated.
+- Upgrade `apps/workers/src/job_globe_workers/scoring/match_engine.py` from the current 3-signal engine to the planned 7-component scorer (skill overlap, seniority, location, remote, employment type, role family, salary range).
+- Replace placeholder quick-prep content in `components/job-panel/QuickPrepToolkit` with OpenAI-generated content stored in a per-user/job cache with a 24-hour TTL.
+
+### Step 5 — Alert Delivery Pipeline (P1)
+
+- Build a background alert evaluator worker under `apps/workers/src/job_globe_workers/` that runs on a schedule, queries `jobs_canonical` against saved alert criteria, and produces match events.
+- Add a `notification_feed` table (or extend `audit_events`) for in-app notifications.
+- Integrate a transactional email provider (decision pending) for alert email delivery with daily caps and digest bundling.
+- Implement the alert delivery history table to track send status and suppression.
+
+### Step 6 — Worker Hardening (P2)
+
+- Add Redis consumer group support and explicit message acknowledgement to the event bus (`apps/workers/src/job_globe_workers/event_bus/consumer.py`).
+- Implement retry logic with exponential back-off and a dead-letter stream for failed messages.
+- Add webhook receiver endpoints for Greenhouse and Lever push events.
+- Add per-source rate-limit bucket enforcement in the discovery connectors (`apps/workers/src/job_globe_workers/agents/discovery/connectors/base.py` already has retry back-off; rate-limit token buckets are missing).
+- Add live staging ingestion evidence (currently no repo-visible proof of a live multi-source run).
+
+### Step 7 — Privacy Self-Service (P1, requires Step 1 legal approval)
+
+- Implement `DELETE /api/account` route that removes all user data across `users`, `profiles`, `resume_extractions`, `saved_jobs`, `job_applications`, `job_alerts`, and Supabase Storage.
+- Implement `GET /api/account/export` that returns a GDPR-style JSON data export.
+- Extend audit event coverage to all tables and all user-triggered events beyond the Phase 1 set.
+- Add audit retention policy and an admin access control layer.
+
+### Step 8 — Infrastructure And Observability (P2)
+
+- Define production worker deployment target (container service, VM, or serverless) and write a rollback runbook.
+- Add OpenTelemetry trace instrumentation across `apps/web` and `apps/workers/src/job_globe_workers/observability/tracing.py` (currently a stub).
+- Build an internal KPI/admin dashboard surfacing job ingestion counts, match score distributions, alert delivery rates, and error rates.
+- Add backup/restore procedure for the production PostgreSQL instance.
+- Write incident response runbook referencing the observability stack.
+
+### Step 9 — Launch Hardening (P2/P3)
+
+- Run Lighthouse CI with a defined performance budget against the production URL.
+- Execute load tests for the `/api/jobs` route under realistic concurrent user counts.
+- Run worker replay tests against a representative job dataset.
+- Calibrate match scoring weights from behavioral click-through signals and human review sets.
+- Complete full real-device mobile QA beyond the Phase 1 mobile viewport smoke screenshots.
+
+---
 
 ## Clear Next Steps
 
-1. Run human screen-reader and legal/privacy review before any public launch.
-2. Decide alert delivery scope for the next release.
-3. Start resume parsing only after privacy copy and data-processing scope are approved.
-4. Plan production worker deployment, observability, and rollback evidence.
+1. Assign a legal/privacy reviewer before any public-facing work on resume parsing or account data export.
+2. Fix `useAlerts()` and `useMatchScore()` stubs immediately — they silently do nothing in the current deployed app.
+3. Wire `IntroOverlay` into `GlobeExperience` or delete the component to avoid dead code.
+4. Decide alert delivery scope (in-app only vs. email) before starting Step 5.
+5. Choose production hosting for workers before starting Steps 6–8.
+6. Resume parsing (Step 3) and embedding generation (Step 4) require OpenAI key and privacy approval — do not start without both.
