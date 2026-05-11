@@ -1,136 +1,174 @@
-# Jarvis Job Globe
+# Job Globe
 
-Jarvis Job Globe is a full-stack job discovery platform. Users can browse worldwide job demand through an interactive globe, filter jobs, inspect details, save roles, manage a profile, upload a resume, create alerts, and track application redirects.
+Job Globe is a job-discovery platform that lets users explore job demand geographically, open official application links, save roles, manage a profile, upload a resume file, create alerts, and view application history.
 
-Production URL: https://job-globe-com-web.vercel.app/
+The repository is not launch-ready. It contains a working Next.js web app, Supabase-backed API routes, PostgreSQL schema, local Docker infrastructure, and Python worker pipeline code. The AI matching, resume parsing, alert delivery, privacy self-service, production infrastructure, and launch-hardening work are still incomplete.
 
-## Current Status
+## Problem Statement
 
-The core product is implemented and the repository is in launch hardening / Phase 6 prep.
+Job listings are scattered across company career sites, ATS-hosted boards, government portals, and aggregators. Job Globe organizes jobs by geography, company, and role context so users can see where demand is concentrated before visiting the official application source.
 
-For the centralized handoff documentation, use:
+## Implemented Features
 
-- [Project Status](docs/md/PROJECT_STATUS.md)
-- [Frontend Module](docs/md/FRONTEND.md)
-- [API Module](docs/md/API.md)
-- [Workers Module](docs/md/WORKERS.md)
-- [Database Module](docs/md/DATABASE.md)
-- [Infrastructure Module](docs/md/INFRASTRUCTURE.md)
-- [Shared Packages Module](docs/md/SHARED_PACKAGES.md)
+- Globe-style job exploration with global, country, city/company, and role-marker views.
+- Category, country, city, remote mode, job type, posted-window, and text filters.
+- Job detail panel with official apply link, save action, rule-based match breakdown, and quick-prep sections.
+- 2D fallback map and accessible job-list mode.
+- Supabase login, registration, session, refresh, and logout flows.
+- Authenticated onboarding and profile save flow.
+- Resume raw-file upload, signed URL fetch, and raw object delete through Supabase Storage.
+- Saved jobs for authenticated users, with session-storage fallback for anonymous users.
+- Authenticated alerts CRUD.
+- Authenticated application history API and page.
+- Python worker package for job discovery, URL verification, company identity, geo mapping, taxonomy tagging, and canonical job upsert.
+- PostgreSQL migrations, taxonomy seed, and demo job seed.
+- Local web tests, worker type checks, worker tests, and migration validation.
 
-## Repository Layout
+## Not Yet Implemented
+
+- Background alert evaluation, in-app notification feed, and email delivery.
+- Resume PDF/DOCX parsing and structured profile extraction.
+- Job/profile embedding generation and pgvector-backed semantic matching.
+- Generated quick-prep content and caching.
+- Privacy page, account deletion, data export, and parsed-profile correction.
+- Apply-click recording from the main job panel.
+- Production worker deployment and real Terraform infrastructure.
+- Recorded launch QA, load testing, and security review evidence.
+
+## Tech Stack
+
+- Frontend: Next.js App Router, React, TypeScript, CSS, Zustand.
+- API: Next.js route handlers.
+- Auth, database, and storage: Supabase.
+- Database: PostgreSQL 15 with pgvector, JSONB, GIN indexes, and full-text search.
+- Workers: Python package using httpx, Pydantic, psycopg, Redis, and structlog.
+- Queue/cache: Redis Streams.
+- Tests: Vitest for web, mypy/pytest for workers, migration validation for SQL.
+- Local infrastructure: Docker Compose.
+- CI: GitHub Actions.
+
+## Folder Structure
 
 ```text
 apps/
-  web/                 Next.js web app and API routes
-  workers/             Python worker package and tests
-  jarvis-job-globe/    Original static prototype/reference
+  web/                 Next.js frontend and API routes
+  workers/             Python worker package, tests, and legacy placeholder folders
+  jarvis-job-globe/    Static prototype/reference app, not the production app
 packages/
-  database/            SQL migrations, seeds, migration scripts
-  shared-types/        TypeScript and Python contracts
+  database/            SQL migrations, seeds, and migration scripts
+  shared-types/        TypeScript contracts and partial Python contracts
   config/              Environment templates
 infra/
-  docker/              Docker Compose and Dockerfiles
-  scripts/             Deployment/migration helper scripts
-  terraform/           Placeholder infrastructure files
+  docker/              Docker Compose files and Dockerfiles
+  scripts/             Migration, seed, and deployment helper scripts
+  terraform/           Placeholder Terraform files
 docs/
-  md/                  Central module and project status documentation
-  api/                 Older API-specific notes
-  architecture/        Architecture notes
+  md/                  Maintained architecture, status, handoff, and gap docs
   decisions/           ADRs and privacy framework
+  whole_project/       Reference DOCX product plan/spec
 ```
 
-## Main Architecture
+## Documentation
 
-```text
-Browser
-  -> Next.js web app and API routes
-  -> Supabase Auth, Database, and Storage
+Maintained docs:
 
-Python workers
-  -> external job sources
-  -> Redis Streams
-  -> PostgreSQL canonical job tables
+- `docs/md/architecture.md`
+- `docs/md/project-status.md`
+- `docs/md/developer-handoff.md`
+- `docs/md/project-gap-analysis.md`
 
-PostgreSQL / Supabase
-  -> jobs, profiles, resumes, saved jobs, alerts, applications, audit data
-```
+Decision and privacy references:
 
-The web app reads job data through API routes. Workers are responsible for ingesting and enriching job data. Shared contracts live under `packages/shared-types`.
+- `docs/decisions/ADR-001-monorepo-structure.md`
+- `docs/decisions/ADR-002-database-choice.md`
+- `docs/decisions/ADR-003-globe-library.md`
+- `docs/decisions/ADR-004-embedding-model.md`
+- `docs/decisions/ADR-005-auth-provider.md`
+- `docs/decisions/privacy-framework.md`
 
-## Local Development
+## Local Setup
 
-### Requirements
+Requirements:
 
-- Node.js 20 or newer
-- npm 10 or newer
-- Python 3.11 or newer
-- Docker Desktop for PostgreSQL, Redis, and containerized local runs
+- Node.js 20 or newer.
+- npm 10 or newer.
+- Python 3.11 or newer.
+- Docker Desktop for local PostgreSQL and Redis services.
+- A root `.env` file based on `.env.example`.
 
-### Install dependencies
+Install dependencies:
 
 ```powershell
+cd C:\college\Github\Projects\job-globe.com
+
 npm ci
 
 python -m venv .venv-job-globe
-.\.venv-job-globe\Scripts\activate
+.\.venv-job-globe\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 python -m pip install -e "apps/workers[dev]"
 ```
 
-### Environment
-
-Copy `.env.example` to `.env` and fill in local values. Do not commit `.env`.
-
-Important groups:
-
-- Supabase URL, anon key, service role key
-- `DATABASE_URL`
-- Redis URL
-- Optional source connector API keys
-- Optional alert/email and embedding keys
-
-### Run the web app only
+Run only the web app:
 
 ```powershell
 npm run dev:web
 ```
 
-### Run local services with Docker
+Run local services with Docker:
 
 ```powershell
 npm run dev
 ```
 
-This uses `infra/docker/docker-compose.dev.yml`.
-
-## Common Checks
+Apply database migrations manually:
 
 ```powershell
-npm run lint
-npm run typecheck
-npm run test --workspace=apps/web
-npm run build
-
-.\.venv-job-globe\Scripts\python.exe -m ruff check apps/workers
-.\.venv-job-globe\Scripts\python.exe -m mypy apps/workers/src
-.\.venv-job-globe\Scripts\python.exe -m pytest apps/workers/tests
-
-python packages/database/scripts/validate_migrations.py packages/database/migrations
+.\.venv-job-globe\Scripts\python.exe packages/database/scripts/apply_migrations.py packages/database/migrations
 ```
 
-## CI/CD
+Seed demo data manually:
 
-GitHub Actions runs:
+```powershell
+psql "$env:DATABASE_URL" -v ON_ERROR_STOP=1 -f packages/database/seeds/taxonomy_reference.sql -f packages/database/seeds/demo_jobs.sql
+```
 
-- web lint, typecheck, tests, and build
-- worker ruff, mypy, and pytest
-- database migration validation and apply checks
+## Verification
 
-Vercel deploys the web app from `main`.
+Commands verified locally during the documentation audit on 2026-05-10:
 
-## Documentation Rules
+```powershell
+npm run test --workspace=apps/web
+.\.venv-job-globe\Scripts\python.exe -m mypy apps/workers/src
+.\.venv-job-globe\Scripts\python.exe -m pytest apps/workers/tests
+.\.venv-job-globe\Scripts\python.exe packages/database/scripts/validate_migrations.py packages/database/migrations
+```
 
-- Use `docs/md/PROJECT_STATUS.md` for project-manager status.
-- Use one module file in `docs/md` for developer handoff notes.
-- Keep detailed docs short and link to code paths instead of duplicating code.
-- Update docs when API contracts, worker flows, migrations, or launch status change.
+## Current Status
+
+Current state: working foundation with a functional web app, API layer, database schema, and worker pipeline code. The worker pipeline exists in code but is not production-proven from this repository. AI matching, resume parsing, alert delivery, privacy self-service, observability, and production deployment remain open.
+
+## Roadmap
+
+### Phase 1 - Critical Completion
+
+- Add or replace the missing `/privacy` policy target.
+- Record application clicks from the Apply CTA.
+- Add audit-event writes for sensitive user and worker actions.
+- Clean or quarantine legacy worker placeholder folders.
+- Confirm Supabase staging configuration and record launch QA evidence.
+
+### Phase 2 - Feature Expansion
+
+- Implement resume parsing, structured extraction, confidence review, and correction UI.
+- Implement embeddings and pgvector-backed candidate retrieval.
+- Generate and cache quick-prep content.
+- Add alert evaluation, in-app notifications, and email delivery.
+- Add webhook receivers, source rate-limit handling, Redis consumer groups, retries, and dead-letter queues.
+
+### Phase 3 - Optimization And Scaling
+
+- Define production worker deployment and rollback process.
+- Replace placeholder Terraform with real infrastructure or remove it from scope.
+- Add tracing, dashboards, runbooks, load tests, replay tests, and security review evidence.
+- Calibrate matching from human review and behavioral signals.

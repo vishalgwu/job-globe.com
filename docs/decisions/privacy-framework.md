@@ -2,52 +2,89 @@
 
 ## Status
 
-Drafted for Legal/Privacy Advisor sign-off
+Draft reference for implementation. It is not a legal sign-off.
 
-## Data Collected
+This document reflects the current codebase and the remaining privacy work needed before launch.
 
-- Account data: email, auth provider subject, role, display name.
-- Profile data: headline, preferred locations, skills, work authorization, optional salary expectations.
-- Resume data: uploaded file object key, file hash, parsed text, structured extraction, per-field confidence.
-- Product data: saved jobs, application redirects, alert subscriptions, analytics events.
-- System data: agent run logs and audit events.
+## Data Currently Represented In Code
 
-## Lawful Basis
+- Account data: email, Supabase provider subject, role, display name, timestamps.
+- Profile data: headline, preferred locations, remote preference, work authorization, salary expectation, onboarding preferences, resume consent flag.
+- Resume metadata: raw storage object key, file hash, raw delete deadline, parser version, parsed text field, parsed profile JSON, confidence JSON, retention flag.
+- Product data: saved jobs, application redirect records, alert subscriptions.
+- System data: agent run logs and audit-event table schema.
 
-- Account and product data: contract necessity to provide the service.
-- Resume and profile data: explicit consent during onboarding or resume upload.
-- Analytics and reliability events: legitimate interest, minimized to product operations.
-- Compliance audit logs: legal obligation and legitimate security interest.
+## Current Resume Handling
 
-## Resume Handling Policy
+Implemented:
 
-Resume upload flow: user upload -> private object storage with encryption at rest -> parser extraction into `resume_extractions` -> raw file deleted after `RESUME_RAW_RETENTION_DAYS` unless the user opts to retain it where allowed.
+- Authenticated upload to the Supabase Storage bucket named `resumes`.
+- Object path is scoped by internal user ID.
+- File type and size validation exist in the resume API.
+- Raw file hash and retention deadline are stored in `resume_extractions`.
+- Signed URLs are short-lived.
+- Users can call `DELETE /api/resume` to remove the raw object and clear the object key.
 
-Raw resume files must never be public. Access requires a signed URL scoped to the authenticated user. Parsed fields store confidence values so users can correct low-confidence data.
+Not implemented:
 
-## Retention
+- PDF/DOCX text parsing in the web upload path.
+- Structured resume extraction worker.
+- User correction flow for parsed fields.
+- Automated raw-file deletion after the retention deadline.
+- Account-level delete/export/correction flows.
+- Privacy policy page at `/privacy`, even though resume consent links to it.
 
-- Raw resume files: default 30 days.
+## Lawful Basis Targets
+
+These targets are planned policy requirements and still need legal review:
+
+- Account and core product data: contract necessity to provide the service.
+- Resume/profile data: explicit consent during onboarding or resume upload.
+- Reliability events: legitimate interest, minimized to service operations.
+- Compliance audit logs: security and legal/compliance interest.
+
+## Retention Targets
+
+- Raw resume files: default 30 days unless policy changes through `RESUME_RAW_RETENTION_DAYS`.
 - Parsed profile data: retained while the account is active.
 - Saved jobs, applications, and alerts: retained while the account is active.
-- Audit events: retained for 2 years, then archived or deleted according to compliance policy.
-- Deleted accounts: identifiable profile/resume data removed within 24 hours as a technical target.
+- Audit events: intended compliance retention policy is not implemented in code.
+- Deleted accounts: delete/export/account-erasure workflow is not implemented.
 
 ## Consent UX Requirements
 
-- Onboarding start must state what profile data is collected and why.
-- Resume upload must state raw file retention, parsing purpose, and deletion controls.
-- Work authorization and salary fields are optional and marked sensitive.
-- Alerts require explicit channel selection.
-- Users must have self-service delete, export, and correction controls before launch.
+Implemented:
 
-## Subprocessors
+- Resume upload includes consent text and raw retention language.
+- Work authorization and salary fields are optional in onboarding/profile validation.
 
-- Supabase: authentication and managed database services, if selected for hosted environments.
-- OpenAI: embedding and quick-prep generation in later steps, scoped to minimized prompts.
-- Object storage provider: encrypted resume file storage.
-- Transactional email provider: alert and account emails.
+Missing:
 
-## Sign-off
+- `/privacy` route or external policy page.
+- Notice at onboarding start that clearly explains profile data collection.
+- Delete account, export data, and correction controls.
+- Admin-only access path for audit/compliance records.
+- Verified copy approval from legal/privacy owner.
 
-Legal/privacy sign-off is required before full production launch.
+## Subprocessor And Integration Notes
+
+Current integrations in code:
+
+- Supabase for auth, database, and resume storage.
+- Redis/PostgreSQL for workers when running locally or in deployed worker infrastructure.
+
+Planned but not fully active:
+
+- OpenAI for embeddings and quick-prep generation.
+- Transactional email provider for alerts.
+- Production object storage policy beyond Supabase Storage configuration.
+
+## Launch Blocking Privacy Gaps
+
+- Missing `/privacy` page or policy target.
+- No self-service account deletion.
+- No data export.
+- No profile correction flow for parsed resume data.
+- No automated raw resume retention job.
+- No consistent writes to `audit_events`.
+- No legal/privacy sign-off evidence in the repository.

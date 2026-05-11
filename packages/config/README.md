@@ -1,12 +1,12 @@
 # Config Package
 
-Purpose: committed environment templates for local, staging, and production setup.
+This package contains committed environment templates only. It is not a runtime configuration library.
 
-This package is not a runtime config library. Runtime settings are currently read by:
+Runtime configuration is read from:
 
-- Next.js from root `.env` / Vercel environment variables
-- Workers from `apps/workers/src/job_globe_workers/settings.py`
-- Docker Compose from root `.env`
+- root `.env` or Vercel variables by the Next.js app
+- `apps/workers/src/job_globe_workers/settings.py` by the worker package
+- root `.env` by Docker Compose
 
 Files:
 
@@ -14,8 +14,8 @@ Files:
 - `environments/staging.env.example`
 - `environments/production.env.example`
 
-See also:
+Related documentation:
 
 - `../../.env.example`
-- `../../docs/md/INFRASTRUCTURE.md`
-- `../../docs/md/SHARED_PACKAGES.md`
+- `../../docs/md/architecture.md`
+- `../../docs/md/developer-handoff.md`
