@@ -11,13 +11,20 @@ Consumer group contract:
 
 from __future__ import annotations
 
+import time
 from collections.abc import Iterator
 from typing import Any, cast
 
+import structlog
 from redis import Redis
+from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import ResponseError
 
 from job_globe_workers.settings import settings
+
+logger = structlog.get_logger(__name__)
+
+_REDIS_RETRY_DELAYS = (5, 10, 30, 60)  # seconds between successive retry attempts
 
 
 def _client() -> Any:
@@ -29,14 +36,36 @@ def ensure_consumer_group(stream: str, group: str) -> None:
 
     Uses XGROUP CREATE with MKSTREAM so the stream is created implicitly.
     Silently ignores the BUSYGROUP error if the group already exists.
+
+    Retries with backoff on connection errors so that a temporarily
+    unavailable Redis (e.g. service still starting) does not crash the
+    worker thread permanently.
     """
-    r = _client()
-    try:
-        r.xgroup_create(stream, group, id="$", mkstream=True)
-    except ResponseError as exc:
-        if "BUSYGROUP" in str(exc):
+    for attempt, delay in enumerate(_REDIS_RETRY_DELAYS, start=1):
+        try:
+            r = _client()
+            r.xgroup_create(stream, group, id="$", mkstream=True)
             return
-        raise
+        except ResponseError as exc:
+            if "BUSYGROUP" in str(exc):
+                return
+            raise
+        except (RedisConnectionError, OSError) as exc:
+            logger.warning(
+                "redis.connection_failed",
+                stream=stream,
+                attempt=attempt,
+                max_attempts=len(_REDIS_RETRY_DELAYS),
+                retry_in_seconds=delay,
+                error=str(exc),
+                hint=(
+                    "Check that REDIS_URL is set in Railway service variables"
+                    " and a Redis service is provisioned."
+                ),
+            )
+            if attempt == len(_REDIS_RETRY_DELAYS):
+                raise
+            time.sleep(delay)
 
 
 def read_group_events(

@@ -64,6 +64,22 @@ def main() -> None:
     """Main entry point -- boot all workers, wait for signal."""
     configure_tracing("job-globe-workers")
 
+    # Warn loudly about missing critical env vars before threads start.
+    if settings.redis_url == "redis://localhost:6379/0":
+        logger.warning(
+            "workers.redis_url_is_default",
+            redis_url=settings.redis_url,
+            msg="REDIS_URL is using the default localhost value. "
+                "Add a Redis service in Railway and set REDIS_URL in service variables. "
+                "Stream workers will retry on connection failure.",
+        )
+    if not settings.openai_api_key:
+        logger.warning(
+            "workers.openai_key_missing",
+            msg="OPENAI_API_KEY is not set. "
+                "Embedder and resume parser workers will skip cycles until it is configured.",
+        )
+
     logger.info(
         "workers.starting",
         redis_url=settings.redis_url,

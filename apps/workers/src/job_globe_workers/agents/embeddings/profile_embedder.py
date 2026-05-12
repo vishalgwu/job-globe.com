@@ -164,10 +164,19 @@ def run_profile_embedder_loop(stop_event: threading.Event) -> None:
     logger.info("profile_embedder.loop.started")
 
     pool = get_pool()
-    openai_client = OpenAI(api_key=settings.openai_api_key)
 
     while not stop_event.is_set():
+        # Guard: skip cycle if API key is not yet configured rather than crashing.
+        if not settings.openai_api_key:
+            logger.warning(
+                "profile_embedder.no_api_key",
+                msg="OPENAI_API_KEY not set; skipping cycle. Set OPENAI_API_KEY in Railway.",
+            )
+            stop_event.wait(60.0)
+            continue
+
         try:
+            openai_client = OpenAI(api_key=settings.openai_api_key)
             count = embed_pending_profiles(pool, openai_client)
             if count:
                 logger.info("profile_embedder.loop.cycle", embedded=count)

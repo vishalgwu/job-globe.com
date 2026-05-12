@@ -1,6 +1,6 @@
 # Architecture
 
-Updated: 2026-05-11 (Phase 2–4 execution pass)
+Updated: 2026-05-11 (deployment + schema patch pass)
 
 This is the living implementation map for the repository. It records what exists today, what is scaffolded but inactive, and the technical blockers that affect the MVP.
 
@@ -159,9 +159,9 @@ The Python scoring engine (`match_engine.py`) has a richer 7-component scorer (s
 - `vercel.json` points Vercel to `apps/web`.
 - `railway.json` targets `infra/docker/Dockerfile.workers`.
 - Docker Compose files define Postgres, Redis, web, and workers.
-- `.github/workflows/ci.yml` is stale and still expects older database counts.
-- `.github/workflows/deploy-staging.yml` is a placeholder echo job.
-- `infra/docker/Dockerfile.web` contains invalid Dockerfile syntax in one `COPY` line.
+- `.github/workflows/ci.yml` runs web (lint, typecheck, test, build), workers (ruff, mypy, pytest), and database (migrations + seed + table count) jobs on every PR and push to main.
+- `.github/workflows/deploy-staging.yml` — three jobs: `deploy-web` (Vercel preview via CLI), `deploy-workers` (Railway CLI `railway up --service workers --detach`), `smoke-test` (GET /api/health on preview URL). GitHub secrets configured: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `RAILWAY_TOKEN`.
+- `infra/docker/Dockerfile.web` — multi-stage build (deps → builder → runner), requires `output: "standalone"` in `next.config.mjs` (confirmed present).
 - `infra/terraform/` is placeholder-only.
 
 ## Remaining Launch Blockers
@@ -175,11 +175,15 @@ The Python scoring engine (`match_engine.py`) has a richer 7-component scorer (s
 | Match scoring | ✅ Fixed. Embedding cosine similarity blended into live job detail path. |
 | Application lifecycle | ✅ Fixed. `PATCH /api/applications` with full status progression. |
 | Compare jobs | ✅ Fixed. `GET /api/jobs/compare?ids=...` route added. |
-| Staging deploy | ✅ Fixed. Vercel + Railway deploy workflow in `.github/workflows/deploy-staging.yml`. |
+| Staging deploy | ✅ Fixed. `deploy-staging.yml` written with 3 jobs (deploy-web, deploy-workers, smoke-test). GitHub secrets configured. |
 | Worker ruff lint | ✅ Fixed. All three pipeline workers pass `ruff check` with no violations. |
-| Worker pytest | ⚠️ Needs verification — resume extractor tests require `fitz` and `unstructured` in CI. |
+| OPENAI_API_KEY | ✅ Configured in `.env`. Must also be set in Vercel env vars and Railway service vars. |
+| RESEND_API_KEY | ✅ Configured in `.env`. Alert email delivery now live. |
+| Connector keys | ✅ Adzuna, USAJobs, Workable keys configured in `.env`. SmartRecruiters, Greenhouse, Lever require company-side ATS access — deferred. |
+| Live schema mismatch | ✅ Fixed. All 17 migrations applied to production Supabase (verified 2026-05-12). `parsed_at`, `user_retained`, `alert_deliveries`, `notifications`, `quick_prep_cache`, `audit_retention_policies`, RLS policies, and Storage bucket all present. |
+| Worker pytest | ⚠️ Resume extractor tests require `fitz` and `unstructured` in CI — skip or mock. |
 | Legal privacy page | ⚠️ `/privacy` page has draft text; requires legal sign-off before accepting real users. |
-| RLS/Storage verification | ⚠️ Migration 017 contains policies; requires live Supabase project verification. |
+| RLS/Storage verification | ⚠️ Migration 017 policies — verify in Supabase dashboard after applying the catch-up patch. |
 | Accessibility audit | ✅ Fixed. `role="alert"` on all error messages, `aria-expanded` on job panel, `aria-busy` on map viewport, `aria-label` on close buttons, `aria-live` on status regions. |
-| Load test baseline | ⚠️ k6 script updated (`infra/load-tests/jobs-api.js`) with correct params and `mode` key assertion; baseline run not yet recorded against staging. |
+| Load test baseline | ⚠️ k6 script correct; baseline run not yet recorded against staging URL. |
 | Terraform | ⚠️ `infra/terraform/` is placeholder-only. |

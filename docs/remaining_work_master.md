@@ -1,8 +1,11 @@
 # Jarvis Job Globe — Remaining Work Master List
 
 **Audit date:** 2026-05-11  
+**Last updated:** 2026-05-11 (post-audit execution pass)  
 **Scope:** Full codebase, all product vision DOCX files, `.env`, `.env.example`, all CI/CD config, all Dockerfiles, every API route, all Python workers, every migration.  
 **Method:** Zero-hallucination — every item below is grounded in a direct file read. Unverified assumptions are marked ⚠️ speculation.
+
+**✅ Completed since audit:** 1.1 deploy-staging.yml written (3 jobs: deploy-web, deploy-workers, smoke-test). 1.2 OPENAI_API_KEY set in .env. 2.3 GitHub secrets configured (VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID, RAILWAY_TOKEN).
 
 ---
 
@@ -20,23 +23,12 @@
 
 ## 1. Critical launch blockers
 
-### 1.1 deploy-staging.yml is empty
-🚨 **BLOCKER**  
+### 1.1 ~~deploy-staging.yml is empty~~ ✅ FIXED
 File: `.github/workflows/deploy-staging.yml`  
-The file is 327 bytes. It contains only the workflow name, `on: push: branches: [main]`, and a concurrency block. There are **zero job steps defined**. The Vercel and Railway deployment workflow does not exist yet. No staging environment can be deployed from CI until this is written.
+Written 2026-05-11. Three jobs: `deploy-web` (lint → typecheck → test → Vercel preview deploy), `deploy-workers` (Railway CLI `railway up --service workers`), `smoke-test` (GET /api/health on preview URL).
 
-**Required:** Write the full workflow with `web` job (Vercel deploy using `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`) and `workers` job (Railway deploy using `RAILWAY_TOKEN`).
-
-### 1.2 OPENAI_API_KEY not set
-🚨 **BLOCKER** + 📦 **MISSING CONFIG**  
-File: `.env` (line: `OPENAI_API_KEY=`)  
-Four distinct features fail silently or degrade without this key:
-- Resume parser worker — calls `extract_structured_profile()` via OpenAI. Will error on every resume.
-- Job embedder worker — calls `text-embedding-3-small`. Job embeddings will never be created.
-- Profile embedder worker — same. Embedding-based match scoring will never run; falls back to rule-only.
-- `/api/quick-prep` route — calls `gpt-4o-mini`. Returns nothing useful.
-
-**Required:** Set `OPENAI_API_KEY` in production environment and Railway worker secrets.
+### 1.2 ~~OPENAI_API_KEY not set~~ ✅ FIXED
+Set in `.env` as `OPENAI_API_KEY` — 2026-05-11. Must also be set in Vercel environment variables (for `/api/quick-prep`) and Railway service variables (for resume parser, embedders).
 
 ### 1.3 RESEND_API_KEY not set
 🚨 **BLOCKER** + 📦 **MISSING CONFIG**  
@@ -101,9 +93,8 @@ All RLS policy creation is guarded by `DO $$ BEGIN IF NOT EXISTS ... THEN CREATE
 File: `packages/database/migrations/017_privacy_data_safety.sql`  
 The private `resumes` bucket creation is guarded by `IF NOT EXISTS` on `storage.buckets`. Must be verified in Supabase dashboard: bucket exists, is private, has correct MIME type restrictions (PDF, DOCX, TXT) and 10 MB size limit.
 
-### 2.3 Vercel + Railway secrets not configured
-⚠️ **REQUIRED**  
-GitHub Actions secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, and `RAILWAY_TOKEN` must be configured in the repository before any deployment workflow can run (even after 1.1 is fixed).
+### 2.3 ~~Vercel + Railway secrets not configured~~ ✅ FIXED
+GitHub Actions secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, and `RAILWAY_TOKEN` configured — 2026-05-11.
 
 ### 2.4 Privacy page — legal sign-off required
 ⚠️ **REQUIRED**  
