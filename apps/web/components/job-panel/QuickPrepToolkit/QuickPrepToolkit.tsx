@@ -31,8 +31,14 @@ export function QuickPrepToolkit({ jobId, quickPrep }: QuickPrepToolkitProps) {
 
   const loadPrep = useCallback(
     async (signal?: AbortSignal) => {
+      await Promise.resolve();
+      if (signal?.aborted) {
+        return;
+      }
+
       setStatus("loading");
       setError(null);
+      setContent(null);
 
       try {
         const response = await fetch(`/api/quick-prep?jobId=${encodeURIComponent(jobId)}`, {
@@ -58,10 +64,14 @@ export function QuickPrepToolkit({ jobId, quickPrep }: QuickPrepToolkitProps) {
 
   useEffect(() => {
     const controller = new AbortController();
-    setContent(null);
-    void loadPrep(controller.signal);
+    const timeoutId = window.setTimeout(() => {
+      void loadPrep(controller.signal);
+    }, 0);
 
-    return () => controller.abort();
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, [loadPrep]);
 
   const skillsToHighlight = content?.skills_to_highlight ?? quickPrep.skillsIHave;

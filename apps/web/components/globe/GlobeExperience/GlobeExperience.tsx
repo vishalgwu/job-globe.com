@@ -450,7 +450,7 @@ export function GlobeExperience() {
               id="globe-list-mode"
               role="region"
               aria-label="Accessible job list"
-              aria-expanded={listMode}
+              aria-hidden={!listMode}
             >
               <div className="list-panel-head">
                 <h2>Accessible job list</h2>

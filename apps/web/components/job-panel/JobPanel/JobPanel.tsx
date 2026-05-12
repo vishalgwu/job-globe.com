@@ -29,7 +29,6 @@ export function JobPanel({
     <aside
       className={`job-panel ${isOpen ? "is-open" : ""}`}
       aria-label="Selected job details"
-      aria-expanded={isOpen}
     >
       {isLoading ? <p className="detail-company" aria-live="polite" aria-busy={isLoading}>Loading job detail…</p> : null}
       {!job && !isLoading ? (

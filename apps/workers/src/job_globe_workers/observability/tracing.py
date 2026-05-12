@@ -12,7 +12,7 @@ import structlog
 logger = structlog.get_logger(__name__)
 
 try:
-    from opentelemetry import trace as otel_trace
+    from opentelemetry import trace as otel_trace  # type: ignore[import-not-found]
 except ImportError:  # pragma: no cover - optional dependency hook
     otel_trace = None  # type: ignore[assignment]
 
