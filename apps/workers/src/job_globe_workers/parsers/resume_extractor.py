@@ -34,7 +34,7 @@ def extract_resume_text(path: Path) -> str:
         return path.read_text(encoding="utf-8")
 
     if suffix == ".pdf":
-        import fitz  # type: ignore[import-untyped]  # PyMuPDF
+        import fitz  # type: ignore[import-not-found, import-untyped]  # PyMuPDF
 
         doc: Any = fitz.open(str(path))
         pages: list[str] = []
@@ -44,7 +44,7 @@ def extract_resume_text(path: Path) -> str:
         return "\n".join(pages)
 
     if suffix == ".docx":
-        from unstructured.partition.docx import partition_docx  # type: ignore[import-untyped]
+        from unstructured.partition.docx import partition_docx  # type: ignore[import-not-found, import-untyped]
 
         elements = partition_docx(filename=str(path))
         return "\n".join(str(el) for el in elements if str(el).strip())
