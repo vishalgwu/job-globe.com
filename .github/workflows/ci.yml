@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: python -m pip install --upgrade pip
-      # [dev] only — heavy [parsers] deps (pymupdf, unstructured) are stubbed
+      # [dev] only. Heavy [parsers] deps (pymupdf, unstructured) are stubbed
       # in conftest.py so tests pass without the native libraries in CI.
       - run: python -m pip install -e "apps/workers[dev]"
       - run: ruff check apps/workers

@@ -1,36 +1,34 @@
 # Architecture
 
-Updated: 2026-05-11 (deployment + schema patch pass)
+Updated: 2026-05-12
 
-This is the living implementation map for the repository. It records what exists today, what is scaffolded but inactive, and the technical blockers that affect the MVP.
+This file is the living implementation map for Jarvis Job Globe. It records what exists in code today, how the main flow works, and which technical gaps still matter for launch.
 
 ## Runtime Shape
 
 ```text
 Browser
-  -> Next.js App Router pages and client components
-  -> Next.js route handlers under apps/web/app/api
+  -> Next.js App Router pages
+  -> client components and Zustand stores
+  -> Next.js API route handlers
   -> Supabase Auth, PostgreSQL, and Storage
 
-Greenhouse/Lever webhook push
-  -> HMAC-verified route handler
-  -> Redis discovery stream
+Job source connectors and ATS webhooks
+  -> Redis Streams
+  -> Python worker pipeline
+  -> canonical jobs, companies, locations, taxonomy, embeddings
 
-Python workers
-  -> discovery runner
-  -> verification worker
-  -> company identity worker
-  -> duplicate/canonical job worker
-  -> resume parser
-  -> job/profile embedders
-  -> alert evaluator
-  -> audit cleanup
-  -> health logger
+Resume upload
+  -> private Supabase Storage bucket
+  -> resume parser worker
+  -> structured parsed_profile and confidence JSON
+  -> profile embeddings
 
-PostgreSQL
-  -> users, profiles, resumes, jobs, companies, locations
-  -> saved jobs, applications, alerts, notifications
-  -> embeddings, quick-prep cache, agent runs, audit events
+Alerts and prep
+  -> alert evaluator worker
+  -> alert_deliveries and notifications
+  -> optional Resend email
+  -> OpenAI quick-prep route with database cache
 ```
 
 ## Repository Map
@@ -41,9 +39,9 @@ apps/workers/          Python worker package and tests
 apps/jarvis-job-globe/ Static prototype/reference app, not production
 packages/database/     SQL migrations, seeds, validators, apply scripts
 packages/shared-types/ TypeScript contracts and partial Python contracts
-packages/config/       Environment templates only
-infra/docker/          Docker Compose files and Dockerfiles
-infra/load-tests/      Existing k6 jobs API script
+packages/config/       Environment-template notes
+infra/docker/          Dockerfiles and Docker Compose files
+infra/load-tests/      k6 jobs API script
 infra/terraform/       Placeholder files only
 docs/whole_project/    Product vision/source specification DOCX files
 docs/md/               This architecture map only
@@ -52,138 +50,161 @@ docs/decisions/        Privacy framework only
 
 ## Web App
 
-`apps/web` uses Next.js App Router, React, TypeScript, Zustand, Supabase clients, `ioredis` in webhook route handlers, and the OpenAI SDK in quick-prep route code.
+`apps/web` uses Next.js App Router, React, TypeScript, Zustand, Supabase clients, `globe.gl`, `ioredis` for webhook routes, and the OpenAI SDK for quick prep.
 
 Implemented pages:
 
 - `/` - globe/job discovery experience.
 - `/login` and `/register` - Supabase auth pages.
-- `/onboarding` - onboarding profile and resume upload control.
-- `/profile` - profile summary plus current raw resume view/delete.
+- `/onboarding` - onboarding profile and resume upload entry point.
+- `/profile` - profile summary plus raw resume view/delete and parse status.
 - `/saved` - saved jobs.
-- `/applications` - official-apply redirect history.
+- `/applications` - official-apply redirect history and lifecycle status updates.
 - `/alerts` - alert CRUD.
 - `/privacy` - draft privacy notice, not legal-approved.
 
-The current globe is a custom React/CSS renderer in `GlobeCanvas` and `FallbackMap`. Globe.GL, React Three Fiber, and deck.gl dependencies are not active in the runtime map experience.
+The primary map uses `GlobeCanvas` with `globe.gl`. `FallbackMap` remains available when WebGL is unavailable or the user toggles 2D mode.
 
 ## API Routes
 
-| Route | Auth | Current behavior |
-|---|---|---|
-| `GET /api/jobs` | Optional | Globe/list/detail data from `jobs_canonical`. Detail path uses rule-based + embedding-blend match scoring when the user is signed in. |
-| `GET /api/jobs/compare` | Optional | Fetch 2–4 jobs by ID for side-by-side comparison; includes profile-aware match scores. |
-| `GET /api/health` | No | Environment and Supabase health check. |
-| `/api/auth/session`, `/api/auth/refresh`, `/api/auth/logout` | Mixed | Supabase session state, refresh, and logout. |
-| `GET/POST /api/profile` | Yes | Load/upsert onboarding profile. |
-| `GET/POST/DELETE /api/resume` | Yes | Upload raw resume to Storage, return signed URL + parse status (pending/done), delete current raw object. |
-| `GET/POST/DELETE /api/saved-jobs` | Yes | Saved jobs; anonymous fallback is client-side session storage. |
-| `GET/POST/PATCH/DELETE /api/alerts` | Yes | Alert CRUD. |
-| `GET/POST/PATCH /api/applications` | Yes | List, record, and update application lifecycle status (redirected → applied → interviewing → offer / rejected / withdrawn). |
-| `GET /api/quick-prep` | Optional | OpenAI quick-prep JSON cached in `quick_prep_cache`. Profile-aware quick-prep is also computed inline in the job detail response. |
-| `GET/PATCH /api/notifications` | Yes | Notification feed and mark-read. |
-| `GET/DELETE /api/account` | Yes | Data export and full account deletion (Storage objects + DB rows via `delete_internal_account()` + Supabase Auth user). |
-| `POST /api/webhooks/greenhouse`, `POST /api/webhooks/lever` | HMAC | HMAC-verified webhook push to Redis discovery stream. |
+| Route                                                        | Auth     | Current behavior                                                                                              |
+| ------------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------- |
+| `GET /api/jobs`                                              | Optional | Global/country/city/jobs/detail data from `jobs_canonical`; detail uses profile-aware scoring when signed in. |
+| `GET /api/jobs/compare`                                      | Optional | Fetches 2-4 jobs by ID for side-by-side comparison and top-match calculation.                                 |
+| `GET /api/health`                                            | No       | Environment and Supabase health check.                                                                        |
+| `/api/auth/session`, `/api/auth/refresh`, `/api/auth/logout` | Mixed    | Supabase session state, refresh, and logout.                                                                  |
+| `GET/POST /api/profile`                                      | Yes      | Load/upsert onboarding profile.                                                                               |
+| `GET/POST/DELETE /api/resume`                                | Yes      | Upload raw resume, return signed URL and parse status, delete current raw object.                             |
+| `GET/POST/DELETE /api/saved-jobs`                            | Yes      | Saved-job persistence for authenticated users.                                                                |
+| `GET/POST/PATCH/DELETE /api/alerts`                          | Yes      | Alert CRUD and active-state updates.                                                                          |
+| `GET/POST/PATCH /api/applications`                           | Yes      | List, record, and update application lifecycle status.                                                        |
+| `GET /api/quick-prep`                                        | Optional | OpenAI generated interview prep cached in `quick_prep_cache`.                                                 |
+| `GET/PATCH /api/notifications`                               | Yes      | Notification feed and mark-read.                                                                              |
+| `GET/DELETE /api/account`                                    | Yes      | Data export and account deletion via Storage cleanup, DB function, and Supabase Auth delete.                  |
+| `POST /api/webhooks/greenhouse`, `POST /api/webhooks/lever`  | HMAC     | Constant-time HMAC verification, timestamp freshness check, Redis stream publish.                             |
 
 Protected routes use `resolveRequestUser()`.
 
 ## Worker Pipeline
 
-Active worker entry point: `apps/workers/src/job_globe_workers/main.py`.
+Active entry point: `apps/workers/src/job_globe_workers/main.py`.
 
 ```text
-Discovery runner
-  -> Redis discovery stream
-     -> Verification worker
-        -> jobs_raw + Redis verification stream
-           -> Company identity worker
-              -> companies + Redis canonical stream
-                 -> Duplicate/canonical upsert
+discovery runner
+  -> discovery stream
+     -> verification worker
+        -> jobs_raw and verification stream
+           -> company identity worker
+              -> companies and canonical stream
+                 -> duplicate/canonical worker
                     -> resolve_location()
                     -> classify()
                     -> jobs_canonical
 
-Resume parser
+resume parser
   -> resume_extractions rows
   -> Supabase Storage download
-  -> text extraction
+  -> text extraction for PDF/DOCX/TXT
   -> OpenAI structured extraction
-  -> parsed_text, parsed_profile, confidence
+  -> parsed_profile, confidence, parsed_at
 
-Embedding workers
-  -> OpenAI text-embedding-3-small
+embedding workers
+  -> OpenAI embeddings
   -> job_embeddings and profile_embeddings
 
-Alert evaluator
+alert evaluator
   -> active alerts and new jobs
-  -> alert_deliveries, notifications, optional Resend email
+  -> alert_deliveries and notifications
+  -> optional Resend email
 
-Audit cleanup
+audit cleanup
   -> audit_retention_policies
   -> audit_events.expires_at
   -> expired audit deletion
+
+health
+  -> periodic structured health logs
+  -> HTTP GET /health on WORKER_HEALTH_PORT
 ```
 
-All three pipeline workers (verification, company_identity, duplicate_detection) now use `read_group_events()` + `ack_event()` + `read_pending_events()` from `event_bus/consumer.py`. Stale pending messages are reclaimed via XAUTOCLAIM, and messages exceeding `redis_max_retries` are published to the DLQ stream (`<stream>.dlq`). Consumer group names come from `settings.redis_consumer_group` and `settings.redis_consumer_name`.
+The stream workers use consumer groups, `XACK`, stale pending reclaim via `XAUTOCLAIM`, retry counts, and DLQ publishing through `<stream>.dlq`.
 
 ## Database
 
-Migration validation currently passes for:
+Migration validation passes for:
 
-- 16 migration files.
+- 17 migration files.
 - 21 application tables.
 - `pgvector` extension.
-- GIN indexes.
+- GIN and vector indexes.
 - `resume_extractions.user_id` uniqueness.
-- Alert deliveries, notifications, quick-prep cache.
-- Audit retention policies and expiring audit events.
+- `alert_deliveries`, `notifications`, and `quick_prep_cache`.
+- `audit_retention_policies` and expiring audit events.
+- `delete_internal_account(UUID)`.
+- RLS policy definitions and Supabase Storage bucket/policy definitions guarded for Supabase environments.
 
-Known schema/code mismatches:
-
-- `/api/account` refers to `job_applications`; the schema table is `applications`.
-- Account deletion does not delete raw resume objects from Supabase Storage.
-- Account deletion does not anonymize or remove the internal `users` row.
+Production verification still has to happen in the Supabase dashboard because CI uses a plain pgvector Postgres image and cannot prove Supabase Auth/Storage policy behavior.
 
 ## Match Scoring
 
-Live match scoring in `getJobDetailWithProfile()` (blended):
+The live job detail path calls `getJobDetailWithProfile()`:
 
-1. `fetchEmbeddingScore(jobId, profileId, supabase)` — cosine similarity between `job_embeddings` and `profile_embeddings` rows. Returns null if either row is absent (embedder worker hasn't run yet).
-2. `buildMatchBreakdown(profileSnap, jobSnap, embeddingScore)` — blends embedding score (70% weight) with rule-based scoring (30%) when an embedding score is available, or uses rule-only (100%) as fallback.
-3. Rule-based signals: remote preference, location, job type, role family/taxonomy.
+1. `fetchEmbeddingScore(jobId, profileId, supabase)` computes cosine similarity when both embeddings exist.
+2. `buildMatchBreakdown(profileSnap, jobSnap, embeddingScore)` blends embedding score at 70% and rule-based score at 30% when available.
+3. Rule-based scoring considers remote preference, location, job type, role family, and taxonomy.
 
-The Python scoring engine (`match_engine.py`) has a richer 7-component scorer (skill overlap, seniority, location, remote, employment type, role family, salary) used by the alert evaluator.
+The worker-side Python scorer is richer and is currently used by alert evaluation.
 
-## Infrastructure
+## CI/CD
 
-- `vercel.json` points Vercel to `apps/web`.
-- `railway.json` targets `infra/docker/Dockerfile.workers`.
-- Docker Compose files define Postgres, Redis, web, and workers.
-- `.github/workflows/ci.yml` runs web (lint, typecheck, test, build), workers (ruff, mypy, pytest), and database (migrations + seed + table count) jobs on every PR and push to main.
-- `.github/workflows/deploy-staging.yml` — three jobs: `deploy-web` (Vercel preview via CLI), `deploy-workers` (Railway CLI `railway up --service workers --detach`), `smoke-test` (GET /api/health on preview URL). GitHub secrets configured: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `RAILWAY_TOKEN`.
-- `infra/docker/Dockerfile.web` — multi-stage build (deps → builder → runner), requires `output: "standalone"` in `next.config.mjs` (confirmed present).
-- `infra/terraform/` is placeholder-only.
+`CI` workflow:
 
-## Remaining Launch Blockers
+- Web job: install, lint, typecheck, Vitest, Next build.
+- Worker job: Python 3.11, install `apps/workers[dev]`, ruff, mypy, pytest.
+- Database job: pgvector Postgres service, validate/apply migrations, seed taxonomy/demo data, assert 21 app tables and 17 migrations.
 
-| Area | Status |
-|---|---|
-| Security headers | ✅ Fixed. CSP, HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy in `next.config.mjs`. |
-| Rate limiting | ✅ Fixed. `middleware.ts` — 60 req/min general, 10 req/min for quick-prep and resume. |
-| Redis consumer groups | ✅ Fixed. All three pipeline workers use consumer groups with ack, reclaim, and DLQ. |
-| Resume parse status | ✅ Fixed. `GET /api/resume` returns parseStatus + parsedAt; profile page shows it. |
-| Match scoring | ✅ Fixed. Embedding cosine similarity blended into live job detail path. |
-| Application lifecycle | ✅ Fixed. `PATCH /api/applications` with full status progression. |
-| Compare jobs | ✅ Fixed. `GET /api/jobs/compare?ids=...` route added. |
-| Staging deploy | ✅ Fixed. `deploy-staging.yml` written with 3 jobs (deploy-web, deploy-workers, smoke-test). GitHub secrets configured. |
-| Worker ruff lint | ✅ Fixed. All three pipeline workers pass `ruff check` with no violations. |
-| OPENAI_API_KEY | ✅ Configured in `.env`. Must also be set in Vercel env vars and Railway service vars. |
-| RESEND_API_KEY | ✅ Configured in `.env`. Alert email delivery now live. |
-| Connector keys | ✅ Adzuna, USAJobs, Workable keys configured in `.env`. SmartRecruiters, Greenhouse, Lever require company-side ATS access — deferred. |
-| Live schema mismatch | ✅ Fixed. All 17 migrations applied to production Supabase (verified 2026-05-12). `parsed_at`, `user_retained`, `alert_deliveries`, `notifications`, `quick_prep_cache`, `audit_retention_policies`, RLS policies, and Storage bucket all present. |
-| Worker pytest | ⚠️ Resume extractor tests require `fitz` and `unstructured` in CI — skip or mock. |
-| Legal privacy page | ⚠️ `/privacy` page has draft text; requires legal sign-off before accepting real users. |
-| RLS/Storage verification | ⚠️ Migration 017 policies — verify in Supabase dashboard after applying the catch-up patch. |
-| Accessibility audit | ✅ Fixed. `role="alert"` on all error messages, `aria-expanded` on job panel, `aria-busy` on map viewport, `aria-label` on close buttons, `aria-live` on status regions. |
-| Load test baseline | ⚠️ k6 script correct; baseline run not yet recorded against staging URL. |
-| Terraform | ⚠️ `infra/terraform/` is placeholder-only. |
+`Deploy Staging` workflow:
+
+- Runs on push to `main`.
+- Deploys web to Vercel preview with prebuilt output.
+- Deploys workers to Railway.
+- Smoke-tests `/api/health` and fails unless the response status is `ok`.
+
+Known CI/CD limitations:
+
+- Deployment does not apply Supabase migrations or seeds.
+- Deployment does not run k6.
+- Railway health endpoint exists in code, but Railway-specific health-check configuration still needs production verification.
+- Hosted GitHub Actions were not rerun during the 2026-05-12 local audit.
+
+## Security And Privacy
+
+Implemented:
+
+- Security headers in `next.config.mjs`: CSP, HSTS in production, X-Frame-Options, Referrer-Policy, Permissions-Policy.
+- API CORS allowlist through `ALLOWED_ORIGINS`.
+- In-process API rate limiting in middleware: 60 req/min general, 10 req/min for `/api/quick-prep` and `/api/resume`.
+- HMAC webhook verification for Greenhouse and Lever with replay-window checks.
+- Private resume Storage pathing and raw resume deletion paths.
+- Account export and deletion API paths.
+
+Still required:
+
+- Legal review of privacy policy text.
+- Production dashboard verification of RLS and Storage policies.
+- User-facing account settings UI for export/delete.
+- Parsed-profile correction UI.
+- Shared/distributed rate limiting for multi-instance production.
+
+## Technical Gaps
+
+| Area                    | Current gap                                                                                                 |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Terraform               | `infra/terraform` contains placeholders only.                                                               |
+| Observability           | Web metrics are in-process; worker tracing is a structlog stub; no external metrics/tracing sink.           |
+| Load testing            | k6 script exists; no staging baseline artifact is recorded.                                                 |
+| Production data         | Demo seed is fictional; real connectors and ATS access must be configured and verified.                     |
+| Mobile QA               | Current WebGL globe needs full mobile/browser verification.                                                 |
+| Next.js convention      | `middleware.ts` works, but Next.js 16 warns that the middleware convention is deprecated in favor of proxy. |
+| Shared Python contracts | `profile.py` and `match.py` are placeholders.                                                               |
+| Neighbourhood model     | UI has a job-marker neighbourhood layer, but there is no true sub-city neighbourhood schema/API.            |

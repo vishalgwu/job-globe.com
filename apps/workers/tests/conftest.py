@@ -69,8 +69,8 @@ except ModuleNotFoundError:
     sys.modules.setdefault("fitz", _make_fitz_stub())
 
 try:
-    import unstructured  # noqa: F401
-except ModuleNotFoundError:
+    import unstructured.partition.docx as _unstructured_docx  # noqa: F401
+except (AttributeError, ImportError, ModuleNotFoundError):
     _make_unstructured_stub()
 
 
