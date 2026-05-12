@@ -1,23 +1,15 @@
 "use client";
 
-import type { Dispatch, SetStateAction } from "react";
-
 interface IntroOverlayProps {
   isVisible: boolean;
-  isMuted: boolean;
   onEnter: () => void;
   onPersonalize: () => void;
-  onDemoCluster: () => void;
-  onMutedChange: Dispatch<SetStateAction<boolean>>;
 }
 
 export function IntroOverlay({
   isVisible,
-  isMuted,
   onEnter,
   onPersonalize,
-  onDemoCluster,
-  onMutedChange,
 }: IntroOverlayProps) {
   if (!isVisible) {
     return null;
@@ -39,16 +31,6 @@ export function IntroOverlay({
         </button>
         <button type="button" onClick={onPersonalize}>
           Personalise My Search
-        </button>
-        <button type="button" onClick={onDemoCluster}>
-          View Demo Cluster
-        </button>
-        <button
-          type="button"
-          aria-pressed={isMuted}
-          onClick={() => onMutedChange((value) => !value)}
-        >
-          {isMuted ? "Muted" : "Audio On"}
         </button>
       </div>
     </div>

@@ -24,6 +24,7 @@ from __future__ import annotations
 import signal
 import sys
 import threading
+from collections.abc import Callable
 
 import structlog
 
@@ -37,7 +38,12 @@ from job_globe_workers.agents.embeddings.profile_embedder import run_profile_emb
 from job_globe_workers.agents.resume_parser.worker import run_resume_parser_loop
 from job_globe_workers.agents.verification.worker import run_verification_loop
 from job_globe_workers.db.connection import close_pool, get_pool
-from job_globe_workers.observability.health import log_health_loop
+from job_globe_workers.observability.health import (
+    log_health_loop,
+    mark_thread_started,
+    mark_thread_stopped,
+    run_health_http_loop,
+)
 from job_globe_workers.observability.tracing import configure_tracing
 from job_globe_workers.settings import settings
 
@@ -46,12 +52,22 @@ logger = structlog.get_logger(__name__)
 
 def _start_thread(
     name: str,
-    target: object,
+    target: Callable[[threading.Event], None],
     stop_event: threading.Event,
 ) -> threading.Thread:
+    def _run() -> None:
+        mark_thread_started(name)
+        try:
+            target(stop_event)
+        except Exception as exc:
+            mark_thread_stopped(name, error=str(exc))
+            logger.exception("thread.crashed", name=name, error=str(exc))
+            raise
+        else:
+            mark_thread_stopped(name)
+
     thread = threading.Thread(
-        target=target,  # type: ignore[arg-type]
-        args=(stop_event,),
+        target=_run,
         name=name,
         daemon=True,
     )
@@ -114,6 +130,7 @@ def main() -> None:
         _start_thread("audit_cleanup", run_audit_cleanup_loop, stop_event),
         # Observability
         _start_thread("health", log_health_loop, stop_event),
+        _start_thread("health_http", run_health_http_loop, stop_event),
     ]
 
     def _shutdown(signum: int, frame: object) -> None:  # type: ignore[type-arg]

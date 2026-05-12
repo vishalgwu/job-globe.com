@@ -8,12 +8,23 @@ interface JobPanelProps {
   job: JobDetail | null;
   isOpen: boolean;
   isSaved: boolean;
+  isCompared: boolean;
   isLoading: boolean;
   onClose: () => void;
   onSave: (jobId: string) => void | Promise<void>;
+  onCompare: (jobId: string) => void;
 }
 
-export function JobPanel({ job, isOpen, isSaved, isLoading, onClose, onSave }: JobPanelProps) {
+export function JobPanel({
+  job,
+  isOpen,
+  isSaved,
+  isCompared,
+  isLoading,
+  onClose,
+  onSave,
+  onCompare,
+}: JobPanelProps) {
   return (
     <aside
       className={`job-panel ${isOpen ? "is-open" : ""}`}
@@ -64,9 +75,17 @@ export function JobPanel({ job, isOpen, isSaved, isLoading, onClose, onSave }: J
             >
               {isSaved ? "Saved" : "Save Job"}
             </button>
+            <button
+              className="secondary-cta"
+              type="button"
+              aria-pressed={isCompared}
+              onClick={() => onCompare(job.id)}
+            >
+              {isCompared ? "In Compare" : "Compare"}
+            </button>
           </div>
           <MatchBreakdown breakdown={job.matchBreakdown} />
-          <QuickPrepToolkit quickPrep={job.quickPrep} />
+          <QuickPrepToolkit jobId={job.id} quickPrep={job.quickPrep} />
         </article>
       ) : null}
     </aside>

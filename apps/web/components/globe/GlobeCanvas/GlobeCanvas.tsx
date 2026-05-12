@@ -1,15 +1,20 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type PointerEvent as ReactPointerEvent,
-  type WheelEvent as ReactWheelEvent,
-} from "react";
+/**
+ * GlobeCanvas — Globe.GL WebGL globe replacing the previous CSS-sphere.
+ *
+ * Uses globe.gl (v2) as an imperative vanilla-JS library mounted via useEffect.
+ * The component keeps the same props interface as the CSS-sphere version so
+ * GlobeExperience requires zero changes.
+ *
+ * Layer mapping:
+ *   global       → country-level density points coloured by job count
+ *   country      → city-level points sized by job count
+ *   city         → company bubble points sized by posting count
+ *   neighbourhood → individual job markers; active job highlighted in white
+ */
+
+import { useCallback, useEffect, useRef } from "react";
 
 import type {
   GlobeCityDatum,
@@ -18,6 +23,8 @@ import type {
   GlobeMarker,
   GlobeZoomLayer,
 } from "@job-globe/shared-types";
+
+// ── Types ─────────────────────────────────────────────────────────────────
 
 interface GlobeCanvasProps {
   activeLayer: GlobeZoomLayer;
@@ -33,41 +40,123 @@ interface GlobeCanvasProps {
   onJobSelect: (jobId: string) => void;
 }
 
-interface GlobeView {
-  longitude: number;
-  latitude: number;
-  zoom: number;
-}
-
-interface ProjectedMarker {
-  id: string;
-  className: string;
+interface GlobePoint {
+  __type: "country" | "city" | "company" | "job";
+  lat: number;
+  lng: number;
+  color: string;
+  altitude: number;
+  radius: number;
   label: string;
-  subLabel: string | null;
-  latitude: number;
-  longitude: number;
-  size: string;
-  density: number;
-  title: string;
-  isActive?: boolean;
-  onSelect: () => void;
+  countryCode?: string;
+  city?: string;
+  companyId?: string;
+  jobId?: string;
 }
 
-interface ProjectedPoint {
-  x: number;
-  y: number;
-  z: number;
-  visible: boolean;
+// Globe.GL instance — typed loosely since the library ships its own types but
+// using them here would require a complex generic chain.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type GlobeInstance = any;
+
+// ── Texture URLs (CDN — avoids bundling large images) ────────────────────
+
+const GLOBE_IMG_URL = "/globe-ui/earth_1.png";
+const BUMP_IMG_URL = "/globe-ui/contour1_1.png";
+
+// ── Colour helpers ────────────────────────────────────────────────────────
+
+function densityColor(ratio: number): string {
+  if (ratio >= 0.78) return "#e84545"; // peak  — crimson
+  if (ratio >= 0.48) return "#f5a623"; // high  — amber
+  if (ratio >= 0.25) return "#4a9eff"; // mid   — sky blue
+  return "#1a5fb4"; //                   low   — deep blue
 }
 
-const minZoom = 0.72;
-const maxZoom = 2.35;
-const defaultViews: Record<GlobeZoomLayer, GlobeView> = {
-  global: { longitude: 16, latitude: 18, zoom: 0.96 },
-  country: { longitude: -96, latitude: 38, zoom: 1.26 },
-  city: { longitude: -74, latitude: 40, zoom: 1.48 },
-  neighbourhood: { longitude: -74, latitude: 40, zoom: 1.72 },
+// ── Point builders (one per layer) ───────────────────────────────────────
+
+function buildPoints(
+  activeLayer: GlobeZoomLayer,
+  countries: GlobeCountryDatum[],
+  cities: GlobeCityDatum[],
+  bubbles: GlobeCompanyBubble[],
+  markers: GlobeMarker[],
+  selectedJobId: string | null,
+): GlobePoint[] {
+  if (activeLayer === "country") {
+    const maxCount = Math.max(...cities.map((c) => c.jobCount), 1);
+    return cities.map((city) => {
+      const ratio = city.jobCount / maxCount;
+      return {
+        __type: "city" as const,
+        lat: city.latitude,
+        lng: city.longitude,
+        color: densityColor(ratio),
+        altitude: 0.02 + ratio * 0.06,
+        radius: 0.3 + ratio * 0.5,
+        label: `<b>${city.city}</b><br/>${city.jobCount.toLocaleString()} jobs`,
+        countryCode: city.countryCode,
+        city: city.city,
+      };
+    });
+  }
+
+  if (activeLayer === "city") {
+    return bubbles.map((bubble) => ({
+      __type: "company" as const,
+      lat: bubble.latitude,
+      lng: bubble.longitude,
+      color: "#f5a623",
+      altitude: 0.04,
+      radius: bubble.size === "lg" ? 0.7 : bubble.size === "md" ? 0.5 : 0.35,
+      label: `<b>${bubble.companyName}</b><br/>${bubble.jobCount} open roles`,
+      companyId: bubble.id,
+    }));
+  }
+
+  if (activeLayer === "neighbourhood") {
+    return markers.map((marker) => {
+      const isActive = marker.jobId === selectedJobId;
+      return {
+        __type: "job" as const,
+        lat: marker.latitude,
+        lng: marker.longitude,
+        color: isActive ? "#ffffff" : "#e84545",
+        altitude: isActive ? 0.09 : 0.06,
+        radius: isActive ? 0.45 : 0.28,
+        label: `<b>${marker.label}</b>${marker.salaryHint ? `<br/>${marker.salaryHint}` : ""}`,
+        jobId: marker.jobId,
+      };
+    });
+  }
+
+  // global layer
+  const maxCount = Math.max(...countries.map((c) => c.jobCount), 1);
+  return countries.map((country) => {
+    const ratio = country.jobCount / maxCount;
+    return {
+      __type: "country" as const,
+      lat: country.latitude,
+      lng: country.longitude,
+      color: densityColor(ratio),
+      altitude: 0.01 + ratio * 0.08,
+      radius: 0.3 + ratio * 0.55,
+      label: `<b>${country.countryName}</b><br/>${country.jobCount.toLocaleString()} open roles`,
+      countryCode: country.countryCode,
+    };
+  });
+}
+
+// ── Default point-of-view per layer ──────────────────────────────────────
+
+const DEFAULT_POV: Record<GlobeZoomLayer, { lat: number; lng: number; altitude: number }> = {
+  global: { lat: 20, lng: 10, altitude: 2.2 },
+  country: { lat: 38, lng: -96, altitude: 1.8 },
+  city: { lat: 40, lng: -74, altitude: 1.4 },
+  neighbourhood: { lat: 40, lng: -74, altitude: 1.1 },
 };
+
+// ── Component ─────────────────────────────────────────────────────────────
 
 export function GlobeCanvas({
   activeLayer,
@@ -82,468 +171,141 @@ export function GlobeCanvas({
   onCompanySelect,
   onJobSelect,
 }: GlobeCanvasProps) {
-  const [view, setView] = useState<GlobeView>(defaultViews.global);
-  const dragRef = useRef({
-    isDragging: false,
-    pointerId: null as number | null,
-    startX: 0,
-    startY: 0,
-    longitude: defaultViews.global.longitude,
-    latitude: defaultViews.global.latitude,
+  const containerRef = useRef<HTMLDivElement>(null);
+  const globeRef = useRef<GlobeInstance>(null);
+
+  // Keep handler refs fresh — avoids tearing down/recreating the globe on each
+  // callback identity change while still using the latest prop values.
+  const handlersRef = useRef({ onCountrySelect, onCitySelect, onCompanySelect, onJobSelect });
+  useEffect(() => {
+    handlersRef.current = { onCountrySelect, onCitySelect, onCompanySelect, onJobSelect };
   });
-  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
-  const pinchRef = useRef({ distance: 0, zoom: defaultViews.global.zoom });
-  const interactionUntilRef = useRef(0);
-  const viewRef = useRef(view);
 
+  const handlePointClick = useCallback((point: GlobePoint) => {
+    const h = handlersRef.current;
+    if (point.__type === "country" && point.countryCode) {
+      h.onCountrySelect(point.countryCode);
+    } else if (point.__type === "city" && point.countryCode && point.city) {
+      h.onCitySelect(point.countryCode, point.city);
+    } else if (point.__type === "company" && point.companyId) {
+      h.onCompanySelect(point.companyId);
+    } else if (point.__type === "job" && point.jobId) {
+      h.onJobSelect(point.jobId);
+    }
+  }, []);
+
+  // ── Mount Globe.GL instance once ─────────────────────────────────────────
   useEffect(() => {
-    viewRef.current = view;
-  }, [view]);
+    if (!containerRef.current) return;
 
-  const layerMarkers = useMemo(
-    () =>
-      getLayerMarkers({
-        activeLayer,
-        countries,
-        cities,
-        bubbles,
-        markers,
-        selectedJobId,
-        onCountrySelect,
-        onCitySelect,
-        onCompanySelect,
-        onJobSelect,
-      }),
-    [
-      activeLayer,
-      bubbles,
-      cities,
-      countries,
-      markers,
-      onCitySelect,
-      onCompanySelect,
-      onCountrySelect,
-      onJobSelect,
-      selectedJobId,
-    ],
-  );
+    let cancelled = false;
 
-  useEffect(() => {
-    const focus = getLayerFocus(activeLayer, layerMarkers);
-    if (!focus) return;
+    void (async () => {
+      // Dynamic import — keeps globe.gl (+ three.js) out of the SSR bundle.
+      // Cast to any: globe.gl's TS types don't match its runtime factory API.
+      // The runtime pattern is: GlobeFactory(config)(element)
+      // The TS types say: new GlobeFactory(element, config)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const GlobeFactory = (await import("globe.gl")).default as any;
+      if (cancelled || !containerRef.current) return;
 
-    const timeoutId = window.setTimeout(() => {
-      setView((current) => ({
-        longitude: normalizeLongitude(focus.longitude),
-        latitude: clamp(focus.latitude, -45, 52),
-        zoom: Math.max(current.zoom, defaultViews[activeLayer].zoom),
-      }));
-      interactionUntilRef.current = Date.now() + 1800;
-    }, 0);
+      const containerEl = containerRef.current;
+      const globe: GlobeInstance = GlobeFactory({ animateIn: true })
+        .width(containerEl.clientWidth || 600)
+        .height(containerEl.clientHeight || 500)
+        // Globe surface
+        .globeImageUrl(GLOBE_IMG_URL)
+        .bumpImageUrl(BUMP_IMG_URL)
+        .atmosphereColor("#4a9eff")
+        .atmosphereAltitude(0.22)
+        .backgroundColor("rgba(0,0,0,0)")
+        // Points layer — data bound later via separate effect
+        .pointsData([])
+        .pointLat("lat")
+        .pointLng("lng")
+        .pointColor("color")
+        .pointAltitude("altitude")
+        .pointRadius("radius")
+        .pointLabel("label")
+        .onPointClick(handlePointClick)
+        // Initial camera position
+        .pointOfView(DEFAULT_POV.global, 0);
 
-    return () => window.clearTimeout(timeoutId);
-  }, [activeLayer, layerMarkers]);
+      globe(containerEl);
+      globeRef.current = globe;
 
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (media.matches) return undefined;
+      // Auto-rotate — pauses on user interaction, resumes after 4 s idle.
+      const controls = globe.controls();
+      controls.autoRotate = true;
+      controls.autoRotateSpeed = 0.35;
+      controls.enableDamping = true;
 
-    let frameId = 0;
-    const tick = () => {
-      if (!dragRef.current.isDragging && Date.now() > interactionUntilRef.current) {
-        setView((current) => ({
-          ...current,
-          longitude: normalizeLongitude(current.longitude + 0.035),
-        }));
+      let autoRotateTimer = 0;
+      controls.addEventListener("start", () => {
+        controls.autoRotate = false;
+        window.clearTimeout(autoRotateTimer);
+      });
+      controls.addEventListener("end", () => {
+        window.clearTimeout(autoRotateTimer);
+        autoRotateTimer = window.setTimeout(() => {
+          if (globeRef.current === globe) controls.autoRotate = true;
+        }, 4_000);
+      });
+    })();
+
+    // Keep canvas sized to its container.
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry || !globeRef.current) return;
+      const { width, height } = entry.contentRect;
+      globeRef.current.width(Math.round(width)).height(Math.round(height));
+    });
+    ro.observe(containerRef.current);
+
+    return () => {
+      cancelled = true;
+      ro.disconnect();
+      if (globeRef.current) {
+        try { globeRef.current._destructor?.(); } catch { /* ignore */ }
+        globeRef.current = null;
       }
-
-      frameId = window.requestAnimationFrame(tick);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // mount once
 
-    frameId = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(frameId);
-  }, []);
+  // ── Sync points when layer / data / selection changes ─────────────────────
+  useEffect(() => {
+    if (!globeRef.current) return;
+    const points = buildPoints(activeLayer, countries, cities, bubbles, markers, selectedJobId);
+    globeRef.current.pointsData(points);
+  }, [activeLayer, countries, cities, bubbles, markers, selectedJobId]);
 
-  const updateZoom = useCallback((nextZoom: number) => {
-    interactionUntilRef.current = Date.now() + 2200;
-    setView((current) => ({
-      ...current,
-      zoom: clamp(nextZoom, minZoom, maxZoom),
-    }));
-  }, []);
+  // ── Fly camera to layer default on layer change ────────────────────────────
+  useEffect(() => {
+    if (!globeRef.current) return;
+    globeRef.current.pointOfView(DEFAULT_POV[activeLayer], 800);
+  }, [activeLayer]);
 
-  const handleWheel = useCallback(
-    (event: ReactWheelEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      const multiplier = event.ctrlKey ? 0.012 : 0.0028;
-      updateZoom(viewRef.current.zoom - event.deltaY * multiplier);
-    },
-    [updateZoom],
-  );
-
-  const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    event.currentTarget.setPointerCapture(event.pointerId);
-    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    interactionUntilRef.current = Date.now() + 2500;
-
-    if (pointersRef.current.size === 2) {
-      const points = Array.from(pointersRef.current.values());
-      pinchRef.current = {
-        distance: distanceBetween(points[0], points[1]),
-        zoom: viewRef.current.zoom,
-      };
-      return;
-    }
-
-    dragRef.current = {
-      isDragging: true,
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      longitude: viewRef.current.longitude,
-      latitude: viewRef.current.latitude,
-    };
-  }, []);
-
-  const handlePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!pointersRef.current.has(event.pointerId)) return;
-
-    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    interactionUntilRef.current = Date.now() + 2500;
-
-    if (pointersRef.current.size >= 2) {
-      const points = Array.from(pointersRef.current.values());
-      const nextDistance = distanceBetween(points[0], points[1]);
-      if (pinchRef.current.distance > 0) {
-        setView((current) => ({
-          ...current,
-          zoom: clamp(
-            pinchRef.current.zoom * (nextDistance / pinchRef.current.distance),
-            minZoom,
-            maxZoom,
-          ),
-        }));
-      }
-      return;
-    }
-
-    const drag = dragRef.current;
-    if (!drag.isDragging || drag.pointerId !== event.pointerId) return;
-
-    const deltaX = event.clientX - drag.startX;
-    const deltaY = event.clientY - drag.startY;
-
-    setView((current) => ({
-      ...current,
-      longitude: normalizeLongitude(drag.longitude - deltaX * (0.18 / current.zoom)),
-      latitude: clamp(drag.latitude + deltaY * (0.12 / current.zoom), -55, 55),
-    }));
-  }, []);
-
-  const handlePointerEnd = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-
-    pointersRef.current.delete(event.pointerId);
-    if (dragRef.current.pointerId === event.pointerId) {
-      dragRef.current.isDragging = false;
-      dragRef.current.pointerId = null;
-    }
-
-    if (pointersRef.current.size === 1) {
-      const [remaining] = Array.from(pointersRef.current.entries());
-      dragRef.current = {
-        isDragging: true,
-        pointerId: remaining[0],
-        startX: remaining[1].x,
-        startY: remaining[1].y,
-        longitude: viewRef.current.longitude,
-        latitude: viewRef.current.latitude,
-      };
-    }
-  }, []);
-
-  const globeStyle = {
-    "--globe-scale": view.zoom,
-    "--globe-bg-x": `${50 + normalizeDelta(view.longitude) / 3.6}%`,
-  } as CSSProperties;
+  // ── Fly to selected job marker ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!globeRef.current || !selectedJobId) return;
+    const marker = markers.find((m) => m.jobId === selectedJobId);
+    if (!marker) return;
+    globeRef.current.pointOfView(
+      { lat: marker.latitude, lng: marker.longitude, altitude: 1.0 },
+      600,
+    );
+  }, [selectedJobId, markers]);
 
   return (
     <div
-      className="map-stage is-3d"
+      ref={containerRef}
+      className="globe-gl-stage"
       id="mapStage"
       aria-busy={isLoading}
+      aria-label="Interactive job globe"
       data-testid="interactive-globe"
-      style={globeStyle}
-      onPointerCancel={handlePointerEnd}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerEnd}
-      onWheel={handleWheel}
-    >
-      <div className="globe-zoom-controls" aria-label="Globe zoom controls">
-        <button type="button" aria-label="Zoom out" onClick={() => updateZoom(view.zoom - 0.14)}>
-          -
-        </button>
-        <span>{Math.round(view.zoom * 100)}%</span>
-        <button type="button" aria-label="Zoom in" onClick={() => updateZoom(view.zoom + 0.14)}>
-          +
-        </button>
-      </div>
-      <div className="globe-frame" aria-hidden="true">
-        <div className="globe-halo" />
-        <div className="globe-core">
-          <div className="cloud-band" />
-          <div className="contour contour-a" />
-          <div className="contour contour-b" />
-          <div className="map-texture" />
-        </div>
-      </div>
-      <div className="flat-map" aria-hidden="true" />
-      <div className="marker-layer">
-        {layerMarkers.map((marker) => {
-          const point = projectGlobe(marker.longitude, marker.latitude, view);
-
-          return (
-            <button
-              key={marker.id}
-              aria-label={marker.title}
-              className={`marker ${marker.className}${marker.isActive ? " is-active" : ""}${
-                point.visible ? "" : " is-occluded"
-              }`}
-              type="button"
-              style={markerStyle(point, marker.size, marker.density)}
-              title={marker.title}
-              onClick={marker.onSelect}
-            >
-              <span>{marker.label}</span>
-              {marker.subLabel ? <small>{marker.subLabel}</small> : null}
-            </button>
-          );
-        })}
-      </div>
-    </div>
+      style={{ width: "100%", height: "100%", position: "relative", background: "transparent" }}
+    />
   );
-}
-
-function getLayerMarkers({
-  activeLayer,
-  countries,
-  cities,
-  bubbles,
-  markers,
-  selectedJobId,
-  onCountrySelect,
-  onCitySelect,
-  onCompanySelect,
-  onJobSelect,
-}: {
-  activeLayer: GlobeZoomLayer;
-  countries: GlobeCountryDatum[];
-  cities: GlobeCityDatum[];
-  bubbles: GlobeCompanyBubble[];
-  markers: GlobeMarker[];
-  selectedJobId: string | null;
-  onCountrySelect: (countryCode: string) => void;
-  onCitySelect: (countryCode: string, city: string) => void;
-  onCompanySelect: (companyId: string) => void;
-  onJobSelect: (jobId: string) => void;
-}): ProjectedMarker[] {
-  if (activeLayer === "country") {
-    const maxCityCount = Math.max(...cities.map((city) => city.jobCount), 1);
-
-    return cities.map((city) => {
-      const ratio = city.jobCount / maxCityCount;
-
-      return {
-        id: `${city.countryCode}-${city.city}`,
-        className: `marker-city ${densityClass(ratio)}`,
-        label: cityAbbr(city.city),
-        subLabel: formatCount(city.jobCount),
-        latitude: city.latitude,
-        longitude: city.longitude,
-        size: "auto",
-        density: ratio,
-        title: `${city.city} | ${city.jobCount.toLocaleString()} jobs`,
-        onSelect: () => onCitySelect(city.countryCode, city.city),
-      };
-    });
-  }
-
-  if (activeLayer === "city") {
-    return bubbles.map((bubble) => ({
-      id: bubble.id,
-      className: `marker-company density-high marker-company--${bubble.size}`,
-      label: initials(bubble.companyName),
-      subLabel: formatCount(bubble.jobCount),
-      latitude: bubble.latitude,
-      longitude: bubble.longitude,
-      size: companySize(bubble.size),
-      density: 0.72,
-      title: `${bubble.companyName} | ${bubble.jobCount} open jobs | ${bubble.topCategory}`,
-      onSelect: () => onCompanySelect(bubble.id),
-    }));
-  }
-
-  if (activeLayer === "neighbourhood") {
-    return markers.map((marker) => ({
-      id: marker.id,
-      className: "marker-job density-peak",
-      label: marker.label,
-      subLabel: marker.salaryHint,
-      latitude: marker.latitude,
-      longitude: marker.longitude,
-      size: "16px",
-      density: 0.82,
-      title: `${marker.label} | ${marker.salaryHint ?? "Salary not listed"} | ${marker.remoteMode}`,
-      isActive: marker.jobId === selectedJobId,
-      onSelect: () => onJobSelect(marker.jobId),
-    }));
-  }
-
-  const maxCountryCount = Math.max(...countries.map((country) => country.jobCount), 1);
-
-  return countries.map((country) => {
-    const ratio = country.jobCount / maxCountryCount;
-
-    return {
-      id: country.countryCode,
-      className: `marker-country ${densityClass(ratio)}`,
-      label: country.countryCode,
-      subLabel: formatCount(country.jobCount),
-      latitude: country.latitude,
-      longitude: country.longitude,
-      size: "auto",
-      density: ratio,
-      title: `${country.countryName} | ${country.jobCount.toLocaleString()} open jobs`,
-      onSelect: () => onCountrySelect(country.countryCode),
-    };
-  });
-}
-
-function getLayerFocus(activeLayer: GlobeZoomLayer, markers: ProjectedMarker[]) {
-  if (!markers.length) {
-    return defaultViews[activeLayer];
-  }
-
-  if (activeLayer === "global") {
-    return defaultViews.global;
-  }
-
-  return {
-    longitude: averageLongitude(markers.map((marker) => marker.longitude)),
-    latitude: average(markers.map((marker) => marker.latitude)),
-  };
-}
-
-function markerStyle(point: ProjectedPoint, size: string, density: number): CSSProperties {
-  return {
-    "--x": `${point.x}%`,
-    "--y": `${point.y}%`,
-    "--size": size,
-    "--density": density,
-    "--depth": point.z,
-    zIndex: Math.round(point.z * 1000),
-  } as CSSProperties;
-}
-
-function projectGlobe(longitude: number, latitude: number, view: GlobeView): ProjectedPoint {
-  const lat = toRadians(latitude);
-  const lon = toRadians(normalizeDelta(longitude - view.longitude));
-  const tilt = toRadians(view.latitude);
-  const cosLat = Math.cos(lat);
-  const x = cosLat * Math.sin(lon);
-  const y = Math.sin(lat);
-  const z = cosLat * Math.cos(lon);
-  const cosTilt = Math.cos(tilt);
-  const sinTilt = Math.sin(tilt);
-  const yRotated = y * cosTilt - z * sinTilt;
-  const zRotated = y * sinTilt + z * cosTilt;
-
-  return {
-    x: 50 + x * 42 * view.zoom,
-    y: 50 - yRotated * 39 * view.zoom,
-    z: zRotated,
-    visible: zRotated > -0.04,
-  };
-}
-
-function densityClass(ratio: number): string {
-  if (ratio >= 0.78) return "density-peak";
-  if (ratio >= 0.48) return "density-high";
-  if (ratio >= 0.25) return "density-mid";
-  return "density-low";
-}
-
-function companySize(size: GlobeCompanyBubble["size"]): string {
-  if (size === "lg") return "58px";
-  if (size === "md") return "44px";
-  return "34px";
-}
-
-function cityAbbr(city: string): string {
-  const aliases: Record<string, string> = {
-    "New York": "NYC",
-    "San Francisco": "SF",
-    Toronto: "TOR",
-    London: "LDN",
-    Berlin: "BER",
-    Singapore: "SG",
-  };
-
-  return aliases[city] ?? city.slice(0, 3).toUpperCase();
-}
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
-}
-
-function formatCount(value: number): string {
-  return value >= 1000 ? `${Math.round(value / 100) / 10}k` : String(value);
-}
-
-function average(values: number[]): number {
-  return values.reduce((sum, value) => sum + value, 0) / Math.max(values.length, 1);
-}
-
-function averageLongitude(values: number[]): number {
-  if (!values.length) {
-    return 0;
-  }
-
-  const vector = values.reduce(
-    (accumulator, longitude) => ({
-      x: accumulator.x + Math.cos(toRadians(longitude)),
-      y: accumulator.y + Math.sin(toRadians(longitude)),
-    }),
-    { x: 0, y: 0 },
-  );
-
-  return normalizeLongitude((Math.atan2(vector.y, vector.x) * 180) / Math.PI);
-}
-
-function distanceBetween(a: { x: number; y: number }, b: { x: number; y: number }): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function toRadians(value: number): number {
-  return (value * Math.PI) / 180;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-function normalizeDelta(value: number): number {
-  return ((value + 540) % 360) - 180;
-}
-
-function normalizeLongitude(value: number): number {
-  return ((value + 540) % 360) - 180;
 }

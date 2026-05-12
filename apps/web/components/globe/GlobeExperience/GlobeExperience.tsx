@@ -16,6 +16,10 @@ import type {
 } from "@job-globe/shared-types";
 
 import { FilterBar } from "../../filters/FilterBar/FilterBar";
+import {
+  JobComparePanel,
+  type CompareJobResult,
+} from "../../job-panel/JobComparePanel/JobComparePanel";
 import { JobPanel } from "../../job-panel/JobPanel/JobPanel";
 import { FallbackMap } from "../FallbackMap/FallbackMap";
 import { GlobeCanvas } from "../GlobeCanvas/GlobeCanvas";
@@ -39,6 +43,12 @@ interface LayerSummary {
   items: SummaryItem[];
   breadcrumb: string;
   plottedSignals: number;
+}
+
+interface CompareApiResponse {
+  jobs?: CompareJobResult[];
+  topMatch?: { id: string; score: number } | null;
+  error?: string;
 }
 
 export function GlobeExperience() {
@@ -78,7 +88,12 @@ export function GlobeExperience() {
   const [listMode, setListMode] = useState(false);
   const [webglAvailable, setWebglAvailable] = useState(true);
   const [introVisible, setIntroVisible] = useState(true);
-  const [introMuted, setIntroMuted] = useState(false);
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareJobs, setCompareJobs] = useState<CompareJobResult[]>([]);
+  const [compareTopMatchId, setCompareTopMatchId] = useState<string | null>(null);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [compareError, setCompareError] = useState<string | null>(null);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -207,6 +222,58 @@ export function GlobeExperience() {
     [cities, filters.city, setActiveLayer, setFilters],
   );
 
+  const toggleCompareJob = useCallback((jobId: string) => {
+    setCompareError(null);
+    setCompareIds((current) => {
+      if (current.includes(jobId)) {
+        return current.filter((id) => id !== jobId);
+      }
+      if (current.length >= 4) {
+        return [...current.slice(1), jobId];
+      }
+      return [...current, jobId];
+    });
+  }, []);
+
+  const clearComparison = useCallback(() => {
+    setCompareIds([]);
+    setCompareJobs([]);
+    setCompareTopMatchId(null);
+    setCompareError(null);
+    setCompareOpen(false);
+  }, []);
+
+  const openComparison = useCallback(async () => {
+    if (compareIds.length < 2) {
+      return;
+    }
+
+    setCompareOpen(true);
+    setCompareLoading(true);
+    setCompareError(null);
+
+    try {
+      const ids = compareIds.map(encodeURIComponent).join(",");
+      const response = await fetch(`/api/jobs/compare?ids=${ids}`, { cache: "no-store" });
+      const data = (await response.json().catch(() => ({}))) as CompareApiResponse;
+      if (!response.ok) {
+        throw new Error(data.error ?? "Unable to compare these jobs.");
+      }
+      setCompareJobs(data.jobs ?? []);
+      setCompareTopMatchId(data.topMatch?.id ?? null);
+    } catch (comparisonError) {
+      setCompareJobs([]);
+      setCompareTopMatchId(null);
+      setCompareError(
+        comparisonError instanceof Error
+          ? comparisonError.message
+          : "Unable to compare these jobs.",
+      );
+    } finally {
+      setCompareLoading(false);
+    }
+  }, [compareIds]);
+
   const summary = useMemo(
     () =>
       buildLayerSummary({
@@ -241,11 +308,8 @@ export function GlobeExperience() {
     <main className="globe-rich">
       <IntroOverlay
         isVisible={introVisible}
-        isMuted={introMuted}
         onEnter={() => setIntroVisible(false)}
         onPersonalize={() => { setIntroVisible(false); window.location.href = "/onboarding"; }}
-        onDemoCluster={() => setIntroVisible(false)}
-        onMutedChange={setIntroMuted}
       />
       <a className="skip-link" href="#globe-list-mode">
         Skip to job list
@@ -424,10 +488,39 @@ export function GlobeExperience() {
             isOpen={isPanelOpen}
             isLoading={isPanelLoading}
             isSaved={selectedJob ? isJobSaved(selectedJob.id) : false}
+            isCompared={selectedJob ? compareIds.includes(selectedJob.id) : false}
             onClose={() => setPanelOpen(false)}
             onSave={toggleSavedJob}
+            onCompare={toggleCompareJob}
           />
         </section>
+        <JobComparePanel
+          isOpen={compareOpen}
+          isLoading={compareLoading}
+          error={compareError}
+          jobs={compareJobs}
+          topMatchId={compareTopMatchId}
+          onClose={() => setCompareOpen(false)}
+          onOpenJob={(jobId) => {
+            setCompareOpen(false);
+            void openJob(jobId);
+          }}
+        />
+        {compareIds.length > 0 ? (
+          <div className="compare-tray" aria-live="polite">
+            <span>Compare {compareIds.length}/4</span>
+            <button
+              type="button"
+              disabled={compareIds.length < 2 || compareLoading}
+              onClick={() => void openComparison()}
+            >
+              {compareLoading ? "Loading" : "Compare"}
+            </button>
+            <button type="button" onClick={clearComparison}>
+              Clear
+            </button>
+          </div>
+        ) : null}
         <div className="saved-tray" aria-live="polite">
           Saved jobs: {savedJobIds.length}
         </div>

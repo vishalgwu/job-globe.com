@@ -12,18 +12,24 @@ All functions are side-effect free (read-only) except log_health_loop.
 
 from __future__ import annotations
 
+import json
 import threading
 import time
 from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
+from urllib.parse import urlparse
 
 import structlog
-from redis import Redis
 
 from job_globe_workers.db.connection import get_pool
 from job_globe_workers.settings import settings
+from job_globe_workers.utils import redis_client
 
 logger = structlog.get_logger(__name__)
+
+_THREAD_LOCK = threading.Lock()
+_THREAD_STATES: dict[str, dict[str, Any]] = {}
 
 _STREAMS = [
     settings.discovery_stream,
@@ -45,9 +51,104 @@ _SOURCES = [
 
 # ── Redis stream metrics ───────────────────────────────────────────────────
 
+def _now_iso() -> str:
+    return datetime.now(tz=timezone.utc).isoformat()  # noqa: UP017
+
+
+def mark_thread_started(name: str) -> None:
+    """Record that a worker thread has started."""
+    now = _now_iso()
+    with _THREAD_LOCK:
+        state = _THREAD_STATES.setdefault(name, {})
+        state.update(
+            {
+                "name": name,
+                "status": "running",
+                "started_at": state.get("started_at") or now,
+                "last_heartbeat_at": now,
+                "stopped_at": None,
+                "last_error": None,
+            }
+        )
+
+
+def mark_thread_processed(name: str) -> None:
+    """Record that a worker thread processed useful pipeline work."""
+    now = _now_iso()
+    with _THREAD_LOCK:
+        state = _THREAD_STATES.setdefault(name, {"name": name, "started_at": now})
+        state.update(
+            {
+                "status": "running",
+                "last_heartbeat_at": now,
+                "last_processed_at": now,
+                "processed_events": int(state.get("processed_events", 0)) + 1,
+            }
+        )
+
+
+def mark_thread_stopped(name: str, error: str | None = None) -> None:
+    """Record that a worker thread has exited."""
+    now = _now_iso()
+    with _THREAD_LOCK:
+        state = _THREAD_STATES.setdefault(name, {"name": name, "started_at": now})
+        state.update(
+            {
+                "status": "crashed" if error else "stopped",
+                "last_heartbeat_at": now,
+                "stopped_at": now,
+                "last_error": error,
+            }
+        )
+
+
+def thread_statuses() -> dict[str, Any]:
+    """Return in-memory thread status and last-processed timestamps."""
+    live_threads = {thread.name: thread.is_alive() for thread in threading.enumerate()}
+    with _THREAD_LOCK:
+        states = {name: dict(state) for name, state in _THREAD_STATES.items()}
+
+    for name, state in states.items():
+        state["is_alive"] = bool(live_threads.get(name, False))
+        if state["is_alive"] and state.get("status") == "stopped":
+            state["status"] = "running"
+
+    for name, is_alive in live_threads.items():
+        if name != "MainThread" and name not in states:
+            states[name] = {
+                "name": name,
+                "status": "running" if is_alive else "unknown",
+                "is_alive": is_alive,
+                "started_at": None,
+                "last_heartbeat_at": None,
+                "last_processed_at": None,
+                "processed_events": 0,
+                "stopped_at": None,
+                "last_error": None,
+            }
+
+    return dict(sorted(states.items()))
+
+
+def lightweight_report() -> dict[str, Any]:
+    """Return a fast health report for HTTP checks without DB or Redis calls."""
+    threads = thread_statuses()
+    dead_threads = [
+        name
+        for name, state in threads.items()
+        if name != "health_http" and not state.get("is_alive", False)
+    ]
+    return {
+        "status": "degraded" if dead_threads else "ok",
+        "timestamp": _now_iso(),
+        "threads": threads,
+        "dead_threads": dead_threads,
+    }
+
+
 def queue_depths() -> dict[str, Any]:
     """Return the current length of each Redis stream (pending message count)."""
-    client = Redis.from_url(settings.redis_url, decode_responses=True)  # type: ignore[call-arg]
+    client = redis_client()
     depths: dict[str, int] = {}
     for stream in _STREAMS:
         try:
@@ -165,11 +266,49 @@ def report() -> dict[str, Any]:
 
     return {
         "status": overall,
-        "timestamp": datetime.now(tz=timezone.utc).isoformat(),  # noqa: UP017
+        "timestamp": _now_iso(),
+        "threads": thread_statuses(),
         "queue_depths": depths,
         "source_freshness": freshness,
         "ingestion_summary": summary,
     }
+
+
+class _HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:  # noqa: N802
+        if urlparse(self.path).path != "/health":
+            self.send_error(404)
+            return
+
+        body = json.dumps(lightweight_report()).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, _format: str, *args: Any) -> None:
+        return
+
+
+def run_health_http_loop(stop_event: threading.Event) -> None:
+    """Serve GET /health until the worker plane shuts down."""
+    server = ThreadingHTTPServer(
+        (settings.worker_health_host, settings.worker_health_port),
+        _HealthHandler,
+    )
+    server.timeout = 1.0
+    logger.info(
+        "health.http.started",
+        host=settings.worker_health_host,
+        port=settings.worker_health_port,
+    )
+    try:
+        while not stop_event.is_set():
+            server.handle_request()
+    finally:
+        server.server_close()
+        logger.info("health.http.stopped")
 
 
 def log_health_loop(stop_event: threading.Event, interval_seconds: float = 300.0) -> None:

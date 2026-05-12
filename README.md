@@ -45,20 +45,24 @@ Verified working:
 - Web unit tests pass (48 tests).
 - Worker mypy passes (56 files).
 - Worker ruff lint passes: all three pipeline workers (`verification`, `company_identity`, `duplicate_detection`) clean.
+- Worker pytest green: 106 tests pass in CI without pymupdf/unstructured installed — stubs injected via `conftest.py` sys.modules patching.
 - Accessibility pass complete: `role="alert"` on all error messages, `aria-expanded` on job panel aside, `aria-busy`/`aria-live` on map viewport, `aria-label` on all icon close buttons.
 - k6 load test script updated with correct query params and `mode` key assertion.
 - Staging deploy workflow live: `.github/workflows/deploy-staging.yml` deploys web to Vercel and workers to Railway on every push to `main`.
 - GitHub Actions secrets configured: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `RAILWAY_TOKEN`.
 - Environment configured: `OPENAI_API_KEY`, `RESEND_API_KEY`, Adzuna, USAJobs, and Workable connector keys set in `.env`.
+- CORS: `ALLOWED_ORIGINS` env var wired into Edge middleware; OPTIONS preflight + per-response headers on all `/api/*` routes.
+- Webhook guards: Greenhouse and Lever handlers have HMAC-SHA256 constant-time verification + 5-minute timestamp replay protection.
+- Globe rebuilt with Globe.GL (WebGL): `GlobeCanvas` replaced with globe.gl v2.45 — real 3D Earth texture, atmosphere, density-coloured points per layer, animated camera transitions, auto-rotate with interaction pause. CSS sphere removed.
 
 Remaining gaps (pre-launch):
 
 - Production Supabase RLS and Storage bucket policies — verify in Supabase dashboard (Authentication → Policies). All 17 migrations confirmed applied 2026-05-12.
 - Legal privacy review and `/privacy` page sign-off required before accepting real users.
 - Load-test baseline run (`k6 run infra/load-tests/jobs-api.js --env BASE_URL=<staging-url>`) not yet recorded.
-- Worker pytest not yet green in CI — resume extractor tests require `fitz` and `unstructured`; skip or mock in CI until dependencies are resolved.
-- Globe/map UX simplification and mobile responsiveness pass pending.
 - SmartRecruiters, Greenhouse, and Lever connectors require company-side ATS access — not self-provisioned.
+- Mobile responsiveness pass for globe viewport pending.
+- Provision Redis in Railway and set `REDIS_URL` + `ALLOWED_ORIGINS` in Railway/Vercel service variables before going live.
 
 ## Retained Markdown Docs
 
@@ -98,7 +102,7 @@ npm run dev
 
 ## Verification Snapshot
 
-Last checked (2026-05-11):
+Last checked (2026-05-12):
 
 | Check | Result |
 |---|---|
@@ -107,7 +111,7 @@ Last checked (2026-05-11):
 | `.\.venv-job-globe\Scripts\python.exe -m mypy apps/workers/src` | Passed: 56 files. |
 | `npm run typecheck` | Expected to pass — `openai` and `ioredis` are in dependencies and ship their own types. Recheck after `npm ci`. |
 | `.\.venv-job-globe\Scripts\python.exe -m ruff check apps/workers` | Passed: no violations. |
-| `.\.venv-job-globe\Scripts\python.exe -m pytest apps/workers/tests` | Fails: resume parser tests require `fitz` and `unstructured`. |
+| `.\.venv-job-globe\Scripts\python.exe -m pytest apps/workers/tests` | Passed: 106 tests. fitz/unstructured stubbed via conftest.py. |
 | Railway worker logs | Fails with `column "parsed_at" does not exist` until migration patch is applied to Supabase. |
 
 ## Documentation Discipline

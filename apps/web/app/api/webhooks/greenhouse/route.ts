@@ -4,6 +4,9 @@ import Redis from "ioredis";
 
 export const runtime = "nodejs";
 
+// Reject webhooks older than 5 minutes to prevent replay attacks.
+const TIMESTAMP_TOLERANCE_SECONDS = 300;
+
 function verifySignature(secret: string, body: string, signature: string): boolean {
   const expected = createHmac("sha256", secret).update(body).digest("hex");
   // Constant-time comparison to prevent timing attacks
@@ -13,6 +16,20 @@ function verifySignature(secret: string, body: string, signature: string): boole
     mismatch |= expected.charCodeAt(i) ^ signature.charCodeAt(i);
   }
   return mismatch === 0;
+}
+
+/**
+ * Greenhouse sends a `Timestamp` header containing Unix epoch seconds.
+ * Returns true if the timestamp is within TIMESTAMP_TOLERANCE_SECONDS of now.
+ * If no header is present we allow the request through (header is optional on
+ * ping events) — the HMAC is the primary security control.
+ */
+function isTimestampFresh(timestampHeader: string | null): boolean {
+  if (!timestampHeader) return true;
+  const ts = parseInt(timestampHeader, 10);
+  if (isNaN(ts)) return false;
+  const ageSecs = Math.abs(Date.now() / 1_000 - ts);
+  return ageSecs <= TIMESTAMP_TOLERANCE_SECONDS;
 }
 
 interface GreenhouseJobPost {
@@ -46,6 +63,13 @@ export async function POST(request: NextRequest) {
   if (!verifySignature(secret, body, signature)) {
     console.warn("[webhook/greenhouse] Signature mismatch.");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // 2b. Replay protection — reject stale webhooks.
+  const timestampHeader = request.headers.get("Timestamp");
+  if (!isTimestampFresh(timestampHeader)) {
+    console.warn("[webhook/greenhouse] Stale webhook rejected (timestamp out of tolerance).");
+    return NextResponse.json({ error: "Stale webhook." }, { status: 401 });
   }
 
   // 3. Parse JSON payload

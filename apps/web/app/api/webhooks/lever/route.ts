@@ -4,6 +4,9 @@ import Redis from "ioredis";
 
 export const runtime = "nodejs";
 
+// Reject webhooks older than 5 minutes to prevent replay attacks.
+const TIMESTAMP_TOLERANCE_SECONDS = 300;
+
 function verifySignature(secret: string, body: string, signature: string): boolean {
   const expected = createHmac("sha256", secret).update(body).digest("hex");
   if (expected.length !== signature.length) return false;
@@ -12,6 +15,19 @@ function verifySignature(secret: string, body: string, signature: string): boole
     mismatch |= expected.charCodeAt(i) ^ signature.charCodeAt(i);
   }
   return mismatch === 0;
+}
+
+/**
+ * Lever includes `triggeredAt` in the body as a Unix epoch in milliseconds.
+ * Returns false (stale) if the timestamp is outside TIMESTAMP_TOLERANCE_SECONDS.
+ * A missing/unparseable value is treated as fresh — HMAC is the primary guard.
+ */
+function isTriggeredAtFresh(triggeredAt: string | number | undefined): boolean {
+  if (triggeredAt === undefined || triggeredAt === null) return true;
+  const ms = typeof triggeredAt === "number" ? triggeredAt : parseInt(String(triggeredAt), 10);
+  if (isNaN(ms)) return true;
+  const ageSecs = Math.abs(Date.now() - ms) / 1_000;
+  return ageSecs <= TIMESTAMP_TOLERANCE_SECONDS;
 }
 
 interface LeverPosting {
@@ -54,6 +70,12 @@ export async function POST(request: NextRequest) {
     parsed = JSON.parse(body) as LeverWebhookBody;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  // 3b. Replay protection — reject stale webhooks using body timestamp.
+  if (!isTriggeredAtFresh(parsed.triggeredAt)) {
+    console.warn("[webhook/lever] Stale webhook rejected (triggeredAt out of tolerance).");
+    return NextResponse.json({ error: "Stale webhook." }, { status: 401 });
   }
 
   const event = parsed.event ?? "";

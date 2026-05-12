@@ -25,7 +25,6 @@ and produces the finished jobs_canonical row plus taxonomy links.
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 import threading
 import uuid
@@ -39,6 +38,9 @@ from job_globe_workers.agents.categorisation.tagger import (
     infer_seniority_from_title,
     write_taxonomy_links,
 )
+from job_globe_workers.observability.health import mark_thread_processed
+from job_globe_workers.observability.tracing import trace_span
+from job_globe_workers.utils import deserialise_stream_payload
 
 # DB, geo, event-bus imports are deferred to function bodies so that
 # extract_skills() and compute_fingerprint() are importable in tests
@@ -104,22 +106,16 @@ def compute_fingerprint(*, title: str, company_name: str, city: str) -> str:
 
 # ── Main pipeline stage ────────────────────────────────────────────────────
 
-def _deserialise(payload: dict[str, str]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in payload.items():
-        if not value:
-            result[key] = None
-        elif key in ("metadata", "required_skills") and value.startswith(("{", "[")):
-            try:
-                result[key] = json.loads(value)
-            except json.JSONDecodeError:
-                result[key] = value
-        else:
-            result[key] = value
-    return result
-
-
 def process_canonical_event(
+    event: dict[str, Any], taxonomy_index: dict[str, dict[str, uuid.UUID]]
+) -> bool:
+    title = str(event.get("title", ""))
+    apply_url = str(event.get("verified_apply_url") or event.get("apply_url") or "")
+    with trace_span("pipeline.canonicalize", title=title, apply_url=apply_url):
+        return _process_canonical_event(event, taxonomy_index)
+
+
+def _process_canonical_event(
     event: dict[str, Any], taxonomy_index: dict[str, dict[str, uuid.UUID]]
 ) -> bool:
     """Process one enriched event from the canonical stream.
@@ -226,6 +222,7 @@ def process_canonical_event(
         taxonomy_links=written,
         skills=len(required_skills),
     )
+    mark_thread_processed("duplicate_detection")
     return True
 
 
@@ -262,7 +259,7 @@ def run_duplicate_detection_loop(stop_event: threading.Event) -> None:
     logger.info("dedupe.taxonomy_loaded", categories=list(taxonomy_index.keys()))
 
     def _handle_event(msg_id: str, payload: dict[str, str]) -> bool:
-        event = _deserialise(payload)
+        event = deserialise_stream_payload(payload)
         ok = process_canonical_event(event, taxonomy_index)
         return ok
 

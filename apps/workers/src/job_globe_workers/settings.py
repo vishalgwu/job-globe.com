@@ -90,6 +90,8 @@ class WorkerSettings(BaseSettings):
     worker_poll_interval_seconds: float = Field(default=5.0)
     db_pool_min_size: int = Field(default=2)
     db_pool_max_size: int = Field(default=10)
+    worker_health_host: str = Field(default="0.0.0.0", alias="WORKER_HEALTH_HOST")
+    worker_health_port: int = Field(default=8080, alias="WORKER_HEALTH_PORT")
 
     # Redis consumer group settings
     redis_consumer_group: str = Field(default="job-globe-workers", alias="REDIS_CONSUMER_GROUP")

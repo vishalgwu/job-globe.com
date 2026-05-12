@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import threading
 from typing import Any
 
@@ -20,23 +19,9 @@ from job_globe_workers.event_bus.consumer import (
 )
 from job_globe_workers.event_bus.producer import publish_event
 from job_globe_workers.settings import settings
+from job_globe_workers.utils import deserialise_stream_payload, serialise_stream_payload
 
 logger = structlog.get_logger(__name__)
-
-
-def _deserialise(payload: dict[str, str]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in payload.items():
-        if not value:
-            result[key] = None
-        elif key in ("metadata", "required_skills") and value.startswith(("{", "[")):
-            try:
-                result[key] = json.loads(value)
-            except json.JSONDecodeError:
-                result[key] = value
-        else:
-            result[key] = value
-    return result
 
 
 def _process_msg(
@@ -50,7 +35,7 @@ def _process_msg(
 
     Returns True on success; caller is responsible for ack_event().
     """
-    event = _deserialise(payload)
+    event = deserialise_stream_payload(payload)
     company_name = event.get("company_name") or "Unknown"
     apply_url = event.get("verified_apply_url") or event.get("apply_url") or ""
     source = event.get("source", "unknown")
@@ -63,11 +48,7 @@ def _process_msg(
         verification_trust=trust,
     )
 
-    out: dict[str, str] = {
-        k: (str(v) if not isinstance(v, (dict, list)) else json.dumps(v))
-        for k, v in event.items()
-        if v is not None
-    }
+    out = serialise_stream_payload(event)
     out["company_id"] = str(company_id)
     publish_event(settings.canonical_stream, out)
     return True

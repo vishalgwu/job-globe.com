@@ -42,6 +42,8 @@ from job_globe_workers.db.repositories.agent_runs import (
 )
 from job_globe_workers.db.repositories.audit import record_worker_failure
 from job_globe_workers.event_bus.producer import publish_event
+from job_globe_workers.observability.health import mark_thread_processed
+from job_globe_workers.observability.tracing import trace_span
 from job_globe_workers.settings import settings
 
 logger = structlog.get_logger(__name__)
@@ -140,29 +142,31 @@ def run_discovery_once(stop_event: threading.Event | None = None) -> None:
         error_msg: str | None = None
 
         try:
-            for raw_job in connector.fetch_with_retry():
-                if stop_event and stop_event.is_set():
-                    break
-                try:
-                    event = _build_event_payload(source_name, raw_job)
-                    publish_event(settings.discovery_stream, event)
-                    processed += 1
-                except Exception as exc:  # noqa: BLE001
-                    failed += 1
-                    logger.warning(
-                        "discovery.publish_failed",
-                        source=source_name,
-                        error=str(exc),
-                    )
-                    record_worker_failure(
-                        pool,
-                        agent_name="discovery",
-                        error=exc,
-                        metadata={
-                            "failurePoint": "publish",
-                            "source": source_name,
-                        },
-                    )
+            with trace_span("pipeline.discovery", source=source_name):
+                for raw_job in connector.fetch_with_retry():
+                    if stop_event and stop_event.is_set():
+                        break
+                    try:
+                        event = _build_event_payload(source_name, raw_job)
+                        publish_event(settings.discovery_stream, event)
+                        processed += 1
+                        mark_thread_processed("discovery")
+                    except Exception as exc:  # noqa: BLE001
+                        failed += 1
+                        logger.warning(
+                            "discovery.publish_failed",
+                            source=source_name,
+                            error=str(exc),
+                        )
+                        record_worker_failure(
+                            pool,
+                            agent_name="discovery",
+                            error=exc,
+                            metadata={
+                                "failurePoint": "publish",
+                                "source": source_name,
+                            },
+                        )
         except Exception as exc:  # noqa: BLE001
             error_msg = str(exc)
             logger.error(

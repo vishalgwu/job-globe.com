@@ -18,7 +18,6 @@ For each event the worker:
 
 from __future__ import annotations
 
-import json
 import threading
 from typing import Any
 
@@ -37,30 +36,22 @@ from job_globe_workers.event_bus.consumer import (
     read_pending_events,
 )
 from job_globe_workers.event_bus.producer import publish_event
+from job_globe_workers.observability.health import mark_thread_processed
+from job_globe_workers.observability.tracing import trace_span
 from job_globe_workers.settings import settings
+from job_globe_workers.utils import deserialise_stream_payload, serialise_stream_payload
 
 logger = structlog.get_logger(__name__)
 
 
-def _deserialise_event(payload: dict[str, str]) -> dict[str, Any]:
-    """Reconstruct nested structures from the flattened Redis Streams payload."""
-    result: dict[str, Any] = {}
-    for key, value in payload.items():
-        if not value:
-            result[key] = None
-            continue
-        # Try JSON parse for known nested fields
-        if key in ("metadata", "required_skills") and value.startswith(("{", "[")):
-            try:
-                result[key] = json.loads(value)
-                continue
-            except json.JSONDecodeError:
-                pass
-        result[key] = value
-    return result
-
-
 def _process_event(event: dict[str, Any], pool: Any) -> bool:
+    source = str(event.get("source", "unknown"))
+    source_job_id = str(event.get("source_job_id", ""))
+    with trace_span("pipeline.verify", source=source, source_job_id=source_job_id):
+        return _process_event_inner(event, pool)
+
+
+def _process_event_inner(event: dict[str, Any], pool: Any) -> bool:
     """Process one raw job event.
 
     Returns True if the job was verified live and forwarded downstream.
@@ -109,16 +100,13 @@ def _process_event(event: dict[str, Any], pool: Any) -> bool:
         return False
 
     # Forward to verification stream for downstream workers
-    downstream: dict[str, str] = {
-        k: (str(v) if not isinstance(v, (dict, list)) else json.dumps(v))
-        for k, v in event.items()
-        if v is not None
-    }
+    downstream = serialise_stream_payload(event)
     downstream["raw_job_id"] = str(raw_id)
     downstream["trust_score"] = str(check.trust_score)
     downstream["verified_apply_url"] = check.final_url
 
     publish_event(settings.verification_stream, downstream)
+    mark_thread_processed("verification")
     logger.debug(
         "verification.forwarded",
         source=source,
@@ -157,7 +145,7 @@ def _run_one_batch(
             failed += 1
             continue
         try:
-            event = _deserialise_event(payload)
+            event = deserialise_stream_payload(payload)
             forwarded = _process_event(event, pool)
             if forwarded:
                 processed += 1
@@ -178,7 +166,7 @@ def _run_one_batch(
         if stop_event.is_set():
             break
         try:
-            event = _deserialise_event(payload)
+            event = deserialise_stream_payload(payload)
             forwarded = _process_event(event, pool)
             if forwarded:
                 processed += 1

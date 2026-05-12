@@ -13,22 +13,18 @@ from __future__ import annotations
 
 import time
 from collections.abc import Iterator
-from typing import Any, cast
+from typing import Any
 
 import structlog
-from redis import Redis
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import ResponseError
 
-from job_globe_workers.settings import settings
+from job_globe_workers.event_bus.producer import publish_to_dlq as _publish_to_dlq
+from job_globe_workers.utils import redis_client
 
 logger = structlog.get_logger(__name__)
 
 _REDIS_RETRY_DELAYS = (5, 10, 30, 60)  # seconds between successive retry attempts
-
-
-def _client() -> Any:
-    return cast(Any, Redis.from_url(settings.redis_url, decode_responses=True))
 
 
 def ensure_consumer_group(stream: str, group: str) -> None:
@@ -43,7 +39,7 @@ def ensure_consumer_group(stream: str, group: str) -> None:
     """
     for attempt, delay in enumerate(_REDIS_RETRY_DELAYS, start=1):
         try:
-            r = _client()
+            r = redis_client()
             r.xgroup_create(stream, group, id="$", mkstream=True)
             return
         except ResponseError as exc:
@@ -80,7 +76,7 @@ def read_group_events(
     Calls XREADGROUP GROUP group consumer STREAMS stream >
     Each yielded message must be acknowledged with ack_event() on success.
     """
-    r = _client()
+    r = redis_client()
     results: Any = r.xreadgroup(
         groupname=group,
         consumername=consumer,
@@ -117,7 +113,7 @@ def read_pending_events(
     Uses XAUTOCLAIM to atomically transfer ownership of messages that have
     been idle for at least min_idle_ms milliseconds.
     """
-    r = _client()
+    r = redis_client()
     result: Any = r.xautoclaim(
         stream,
         group,
@@ -144,7 +140,7 @@ def read_pending_events(
 
 def ack_event(stream: str, group: str, msg_id: str) -> None:
     """Acknowledge a successfully processed message (XACK)."""
-    r = _client()
+    r = redis_client()
     r.xack(stream, group, msg_id)
 
 
@@ -153,21 +149,9 @@ def publish_to_dlq(
     msg_id: str,
     payload: dict[str, str],
     error: str,
-) -> None:
-    """Publish a failed message to the dead-letter queue stream.
-
-    The DLQ stream name is stream + settings.redis_dlq_stream_suffix.
-    """
-    from job_globe_workers.event_bus.producer import publish_event
-
-    dlq_stream = stream + settings.redis_dlq_stream_suffix
-    dlq_payload: dict[str, str] = {
-        **payload,
-        "_original_stream": stream,
-        "_original_msg_id": msg_id,
-        "_error": error,
-    }
-    publish_event(dlq_stream, dlq_payload)
+) -> str:
+    """Publish a failed message through the shared DLQ producer."""
+    return _publish_to_dlq(stream, msg_id, payload, error)
 
 
 def read_events(
@@ -178,7 +162,7 @@ def read_events(
 
     Yields (msg_id, payload) using XREAD (no consumer group semantics).
     """
-    r = _client()
+    r = redis_client()
     results: Any = r.xread({stream: last_id}, count=10, block=1000)
     if not results:
         return

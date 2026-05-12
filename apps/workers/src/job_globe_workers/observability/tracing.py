@@ -1,12 +1,20 @@
-"""Tracing configuration placeholder.
+"""Tracing configuration and no-op-safe span helpers."""
 
-Phase 5 will wire OpenTelemetry here.  For now we configure structlog
-with JSON output which is compatible with most log-aggregation platforms.
-"""
+from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import Any
 
 import structlog
+
+logger = structlog.get_logger(__name__)
+
+try:
+    from opentelemetry import trace as otel_trace
+except ImportError:  # pragma: no cover - optional dependency hook
+    otel_trace = None  # type: ignore[assignment]
 
 
 def configure_tracing(service_name: str = "job-globe-workers") -> str:
@@ -24,3 +32,23 @@ def configure_tracing(service_name: str = "job-globe-workers") -> str:
         logger_factory=structlog.PrintLoggerFactory(),
     )
     return service_name
+
+
+@contextmanager
+def trace_span(name: str, **attributes: Any) -> Iterator[None]:
+    """Start an OpenTelemetry span when the API is installed, otherwise no-op."""
+    if otel_trace is None:
+        logger.debug("trace.span.stub", span=name, **attributes)
+        yield
+        return
+
+    tracer = otel_trace.get_tracer("job-globe-workers")
+    with tracer.start_as_current_span(name) as span:
+        for key, value in attributes.items():
+            if value is not None:
+                span.set_attribute(key, value)
+        try:
+            yield
+        except Exception as exc:
+            span.record_exception(exc)
+            raise

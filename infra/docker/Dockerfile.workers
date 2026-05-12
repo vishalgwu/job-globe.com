@@ -28,8 +28,10 @@ RUN pip install --no-cache-dir -r apps/workers/requirements.txt
 # ── Copy application source ───────────────────────────────────────────────────
 COPY apps/workers/src apps/workers/src
 
-# Install the package so `python -m job_globe_workers` resolves correctly
-RUN pip install --no-cache-dir --no-deps -e apps/workers
+# Install the package + [parsers] extras (pymupdf, unstructured) needed in
+# production for resume text extraction.  These are excluded from CI installs
+# to avoid heavy native dependencies during testing.
+RUN pip install --no-cache-dir -e "apps/workers[parsers]"
 
 # Copy shared packages (shared-types etc.) in case workers import from them
 COPY packages/ /packages/
