@@ -44,7 +44,9 @@ def extract_resume_text(path: Path) -> str:
         return "\n".join(pages)
 
     if suffix == ".docx":
-        from unstructured.partition.docx import partition_docx  # type: ignore[import-not-found, import-untyped]
+        from unstructured.partition.docx import (
+            partition_docx,  # type: ignore[import-not-found, import-untyped]
+        )
 
         elements = partition_docx(filename=str(path))
         return "\n".join(str(el) for el in elements if str(el).strip())
